@@ -9,7 +9,7 @@ Users Routes
 
 /**
  * @swagger
- * users/:
+ * /users/:
  *  get:
  *      tags:
  *          - Utenti

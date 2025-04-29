@@ -9,7 +9,7 @@ Percorsi Routes
 
 /**
  * @swagger
- * percorsi/:
+ * /percorsi/:
  *  get:
  *      tags:
  *          - Percorsi

@@ -9,7 +9,7 @@ PDIs Routes
 
 /**
  * @swagger
- * pdi/:
+ * /pdi/:
  *  get:
  *      tags:
  *          - Punti di Interesse
