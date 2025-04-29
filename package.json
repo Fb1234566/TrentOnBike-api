@@ -4,11 +4,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Fb1234566/TrentOnBike-api.git"
+    "url": "git+https://github.coHellom/Fb1234566/TrentOnBike-api.git"
   },
   "author": "",
   "license": "ISC",
@@ -17,6 +18,8 @@
   },
   "homepage": "https://github.com/Fb1234566/TrentOnBike-api#readme",
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }
