@@ -20,6 +20,12 @@ const swaggerOptions = {
             title: 'TrentOnBike',
             version: '1.0.0',
         },
+        servers: [
+            {
+                url: "http://127.0.0.1:3000/api/v1/",
+                description: "Development server"
+            }
+        ]
     },
     apis: ['./routes/*.js'], // files containing annotations as above
 };
