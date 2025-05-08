@@ -9,12 +9,27 @@ const userRoutes = require('./routes/users');
 const pdiRoutes = require('./routes/pdi');
 const percorsoRoutes = require('./routes/percorsi');
 
+// mongoose 
+const mongoose = require('mongoose');
+require('dotenv').config();
+
 // express setup
 const app = express();
 const port = 3000;
 
 //cors
 app.use(cors())
+
+//to read json data from the body of the request
+app.use(express.json());
+
+// Connect to MongoDB Atlas
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log('Connesso a MongoDB Atlas'))
+.catch(err => console.error('Errore connessione:', err));
 
 // swagger-ui-express and swagger-jsdoc setup
 const swaggerOptions = {
@@ -44,5 +59,4 @@ app.use("/api/v1/percorsi", percorsoRoutes); // percorso route
 app.listen(port, () => {
     console.log(`TrentOnBike API listening on http://localhost:${port}`);
 });
-
 
