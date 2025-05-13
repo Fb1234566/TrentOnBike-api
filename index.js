@@ -6,10 +6,11 @@ const cors = require('cors');
 
 // routes imports
 const userRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth'); 
 const pdiRoutes = require('./routes/pdi');
 const percorsoRoutes = require('./routes/percorsi');
 
-// mongoose 
+// mongoose
 const mongoose = require('mongoose');
 require('dotenv').config();
 
@@ -18,7 +19,7 @@ const app = express();
 const port = 3000;
 
 //cors
-app.use(cors())
+app.use(cors());
 
 //to read json data from the body of the request
 app.use(express.json());
@@ -36,27 +37,40 @@ const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'TrentOnBike',
+            title: 'TrentOnBike API',
             version: '1.0.0',
         },
         servers: [
             {
-                url: "http://127.0.0.1:3000/api/v1/",
+                url: `http://localhost:${port}/api/v1/`,
                 description: "Development server"
             }
-        ]
+        ],
+        components: { // Aggiunto per lo schema di sicurezza JWT
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                }
+            }
+        },
+        security: [{ // Applica la sicurezza a tutte le rotte
+            bearerAuth: []
+        }]
     },
-    apis: ['./routes/*.js'], // files containing annotations as above
+    apis: ['./routes/*.js'], // Percorso per le annotazioni Swagger
 };
 const swaggerDocument = swaggerJsDoc(swaggerOptions);
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // routes
-app.use("/api/v1/users", userRoutes); // users route
-app.use("/api/v1/pdi", pdiRoutes); // pdi route
-app.use("/api/v1/percorsi", percorsoRoutes); // percorso route
+app.use("/api/v1/auth", authRoutes); 
+app.use("/api/v1/users", userRoutes); 
+app.use("/api/v1/pdi", pdiRoutes); 
+app.use("/api/v1/percorsi", percorsoRoutes); 
 
 app.listen(port, () => {
     console.log(`TrentOnBike API listening on http://localhost:${port}`);
+    console.log(`Swagger docs available on http://localhost:${port}/api/v1/docs`);
 });
-
