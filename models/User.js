@@ -32,11 +32,11 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ImpostazioniUtente'
     },
-    // tipoUtente: { // Potrebbe servire per GestioneAutenticazione
-    //     type: String,
-    //     enum: ['utente', 'Comune', 'admin'],
-    //     default: 'utente'
-    // }
+    ruolo: { // Serve per controllo dei ruoli
+        type: String,
+        enum: ['utente', 'operatore', 'admin'],
+        default: 'utente'
+    }
 
 }, { timestamps: true }); // timestamps aggiunge createdAt e updatedAt
 

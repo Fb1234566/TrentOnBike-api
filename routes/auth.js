@@ -68,7 +68,8 @@ router.post('/register', async (req, res) => {
             email,
             passwordHash: password, // La passwordHash verrà hashata nel pre-save hook
             nome,
-            cognome
+            cognome,
+            ruolo: 'utente' //forza il ruolo di ogni nuovo registrato a utente. Solo admin può promuovere a 'operatore' tramite endpoint dedicato
         });
 
         const savedUser = await newUser.save();
@@ -84,7 +85,7 @@ router.post('/register', async (req, res) => {
         await savedUser.save();
 
         // Genera token JWT
-        const payload = { userId: savedUser._id };
+        const payload = { userId: savedUser._id, ruolo: user.ruolo};   //modificato: genera token anche a partire dal ruolo dell'utente
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         // Rimuovi passwordHash dalla risposta
@@ -152,7 +153,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Genera token JWT
-        const payload = { userId: user._id };
+        const payload = { userId: user._id, ruolo: user.ruolo};   //modificato: genera token anche a partire dal ruolo dell'utente
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         const userToReturn = user.toObject();
