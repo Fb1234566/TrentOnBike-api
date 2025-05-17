@@ -4,6 +4,7 @@ const User = require('../models/User');
 const StatisticheUtente = require('../models/StatisticheUtente');
 const ImpostazioniUtente = require('../models/ImpostazioniUtente');
 const authenticateToken = require('../middleware/authenticateToken');
+const authorizeRole = require('../middleware/authorizeRole');
 
 /**
  * @swagger
@@ -38,6 +39,9 @@ const authenticateToken = require('../middleware/authenticateToken');
  *           $ref: '#/components/schemas/ImpostazioniUtente'
  *         statistiche:
  *           $ref: '#/components/schemas/StatisticheUtente'
+ *         ruolo:
+ *           type: string
+ *           enum: ['utente', 'operatore', 'admin']
  *     ImpostazioniUtente:
  *        type: object
  *        properties:
@@ -385,14 +389,148 @@ router.post('/me/statistiche/sessioni', authenticateToken, async (req, res) => {
  *                   email:
  *                     type: string
  */
-router.get('/', authenticateToken, async (req, res) => { // Proteggi e magari aggiungi ruolo admin
+router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    //Aggiunto controllo ruolo 'admin' tramite authorizeRole
+
     // Esempio: controllo ruolo (semplificato)
     // const adminUser = await User.findById(req.user.userId);
-    // if (adminUser.tipoUtente !== 'admin') return res.status(403).json({message: "Accesso negato"});
+    // if (adminUser.ruolo !== 'admin') return res.status(403).json({message: "Accesso negato"});
 
     const users = await User.find().select('_id nome email'); // Seleziona solo alcuni campi
     res.json(users);
 });
+
+//PATCH promuove il ruolo di un utente a 'operator' (solo per admin)
+/**
+ * @swagger
+ * /users/{id}/promuovi:
+ *   patch:
+ *     summary: Promuove un utente esistente al ruolo di 'operatore'
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID dell'utente da promuovere
+ *     responses:
+ *       200:
+ *         description: Utente promosso correttamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       401:
+ *         description: Non autorizzato
+ *       403:
+ *         description: Accesso negato
+ *       404:
+ *         description: Utente non trovato
+ */
+router.patch('/:id/promuovi', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'Utente non trovato' });
+
+        user.ruolo = 'operatore';
+        await user.save();
+
+        const userResponse = user.toObject();
+        delete userResponse.passwordHash;
+
+        res.json(userResponse);
+    } catch (err) {
+        res.status(500).json({ message: 'Errore durante la promozione utente', error: err.message });
+    }
+});
+
+//POST registra nuovo utente con ruolo 'operatore' (solo per admin)
+/**
+ * @swagger
+ * /users/register-operator:
+ *   post:
+ *     summary: Registra un nuovo operatore (solo admin)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - nome
+ *               - cognome
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: operatore@comune.it
+ *               password:
+ *                 type: string
+ *                 example: sicura123
+ *               nome:
+ *                 type: string
+ *                 example: Mario
+ *               cognome:
+ *                 type: string
+ *                 example: Rossi
+ *     responses:
+ *       201:
+ *         description: Operatore registrato con successo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       400:
+ *         description: Dati non validi
+ *       403:
+ *         description: Accesso negato (non admin)
+ *       500:
+ *         description: Errore del server
+ */
+router.post('/register-operator', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+        const { email, password, nome, cognome } = req.body;
+
+        if (!email || !password || !nome) {
+            return res.status(400).json({ message: 'Email, password e nome sono obbligatori.' });
+        }
+
+        try {
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return res.status(400).json({ message: 'Email già in uso.' });
+            }
+
+            const newUser = new User({
+                email,
+                passwordHash: password,
+                nome,
+                cognome,
+                ruolo: 'operatore',
+            });
+
+            await newUser.save();
+
+            const userResponse = newUser.toObject();
+            delete userResponse.passwordHash;
+
+            res.status(201).json(userResponse);
+        } catch (err) {
+            console.error('Errore nella registrazione operatore:', err);
+            if (err.name === 'ValidationError') {
+                return res.status(400).json({ message: err.message });
+            }
+            res.status(500).json({ message: 'Errore nel registrare l’operatore.', error: err.message });
+        }
+    }
+);
+
 
 
 // La tua rotta POST /users/ originale ora è gestita da /auth/register
