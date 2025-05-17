@@ -2,6 +2,15 @@ const express = require('express');
 const router = express.Router();
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
+const authorizeRole = require('../middleware/authorizeRole');
+
+/* I permessi dei vari endpoint seguono i principi di separazione dei ruoli e minimo privilegio:
+- utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato
+- operatore può:            visualizzare tutte le segnalazioni, segnarle come lette, cambiare il loro stato
+- admin può:                visualizzare tutte le segnalazioni
+Admin ha il ruolo di supervisionare e configurare il sistema, non svolge le funzioni operative
+Admin può crearsi il suo utente con ruolo operatore se vuole gestire le segnalazioni
+ */
 
 /**
  * @swagger
@@ -56,6 +65,7 @@ const authenticateToken = require('../middleware/authenticateToken');
  *     bearerFormat: JWT
  */
 
+//POST crea una nuove segnalazione (solo per utente)
 /**
  * @swagger
  * /segnalazioni:
@@ -88,7 +98,7 @@ const authenticateToken = require('../middleware/authenticateToken');
  *       400:
  *         description: Dati mancanti o non validi
  */
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) => {
     try {
         const { categoria, descrizione, posizione } = req.body;
 
@@ -110,6 +120,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+//GET ottiene tutte le segnalazioni create dall'utente autenticato (solo per utente)
 /**
  * @swagger
  * /segnalazioni/mie:
@@ -128,7 +139,7 @@ router.post('/', authenticateToken, async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Segnalazione'
  */
-router.get('/mie', authenticateToken, async (req, res) => {
+router.get('/mie', authenticateToken, authorizeRole(['utente']), async (req, res) => {
     try {
         //non restituisce il campo lettaDalComune all'utente (utilizzo select per filtrare i campi)
         const segnalazioni = await Segnalazione.find({ utente: req.user.userId }).select('-lettaDalComune');
@@ -138,11 +149,12 @@ router.get('/mie', authenticateToken, async (req, res) => {
     }
 });
 
+//GET ottiene tutte le segnalazioni (solo per operatore e admin)
 /**
  * @swagger
  * /segnalazioni:
  *   get:
- *     summary: Ottieni tutte le segnalazioni (solo per Comune)
+ *     summary: Ottieni tutte le segnalazioni (solo per operatore Comune e admin)
  *     tags: [Segnalazioni]
  *     security:
  *       - bearerAuth: []
@@ -156,7 +168,7 @@ router.get('/mie', authenticateToken, async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Segnalazione'
  */
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async (req, res) => {
     try {
         const tutte = await Segnalazione.find().populate('utente', 'nome email');
         res.json(tutte);
@@ -165,10 +177,11 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+//PATCH cambia lo stato di una segnalazione (ATTIVA, RISOLTA, SCARTATA) (solo per operatore)
 /**
  * @swagger
  * /segnalazioni/{id}/stato:
- *   put:
+ *   patch:
  *     summary: Aggiorna lo stato di una segnalazione
  *     tags: [Segnalazioni]
  *     security:
@@ -202,7 +215,7 @@ router.get('/', authenticateToken, async (req, res) => {
  *       404:
  *         description: Segnalazione non trovata
  */
-router.put('/:id/stato', authenticateToken, async (req, res) => {
+router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), async (req, res) => {
     const { stato } = req.body;
     const statiValidi = ['ATTIVA', 'RISOLTA', 'SCARTATA'];
 
@@ -230,10 +243,11 @@ router.put('/:id/stato', authenticateToken, async (req, res) => {
     }
 });
 
+//PATCH segna una segnalazione come "letta dal Comune" (solo per operatore)
 /**
  * @swagger
  * /segnalazioni/{id}/lettura:
- *   put:
+ *   patch:
  *     summary: Segna una segnalazione come letta dal Comune
  *     tags: [Segnalazioni]
  *     security:
@@ -254,7 +268,7 @@ router.put('/:id/stato', authenticateToken, async (req, res) => {
  *       404:
  *         description: Segnalazione non trovata
  */
-router.put('/:id/lettura', authenticateToken, async (req, res) => {
+router.patch('/:id/lettura', authenticateToken, authorizeRole(['operatore']), async (req, res) => {
     try {
         const segnalazione = await Segnalazione.findById(req.params.id);
         if (!segnalazione) {
@@ -272,7 +286,6 @@ router.put('/:id/lettura', authenticateToken, async (req, res) => {
 
 module.exports = router;
 
-//TODO: aggiungere controllo ruoli per operazioni di PUT e GET segnalazioni/tutte (ristrette a admin e Comune)
 //TODO: aggiungere sistema di filtraggio per le segnalazioni (filtri per tipologia, per stato, per lette/non lette)
 //TODO: aggiungere endpoint che forniscono statistiche aggregate (numero segnalazioni attive...)
-// valutare quali statistiche calcolarle a ogni chiamata in real time e quali tenere salvate du database (da aggiornare a ogni modifica delle segnalazioni)
+// valutare quali statistiche calcolare a ogni chiamata in real time e quali tenere salvate du database (da aggiornare a ogni modifica delle segnalazioni)
