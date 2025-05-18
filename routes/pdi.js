@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const PDI = require('../models/PDI');
+const authenticateToken = require('../middleware/authenticateToken');
+const authorizeRole = require('../middleware/authorizeRole');
 
 /*
 
@@ -38,7 +40,7 @@ PDIs Routes
  *                     type: string
  */
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
     const pdis = await PDI.find();
     return res.status(200).json(pdis);
 });
@@ -77,7 +79,7 @@ router.get('/', async (req, res) => {
  *         description: Errore di validazione.
  */
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, authorizeRole(["operatore","admin"]), async (req, res) => {
     try {
         const pdi = new PDI(req.body)
         await pdi.save();
@@ -131,7 +133,7 @@ router.post('/', async (req, res) => {
  *         description: Errore di validazione.
  */
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticateToken, authorizeRole(["operatore","admin"]), async (req, res) => {
     try {
         const  updates = req.body;
         const options = {new: true}
@@ -170,7 +172,7 @@ router.patch('/:id', async (req, res) => {
  *         description: Il percorso selezionato non è presente
  */
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, authorizeRole(["operatore","admin"]), async (req, res) => {
     try {
         const pdi = await PDI.findByIdAndDelete(req.params.id);
 

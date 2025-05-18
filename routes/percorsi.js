@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const {Percorso, Tappa} = require('../models/Percorsi');
+const {Percorso, Tappa} = require('../models/Percorso');
 const authenticateToken = require('../middleware/authenticateToken');
+const authorizeRole = require('../middleware/authorizeRole');
 
 /*
 
@@ -52,7 +53,7 @@ router.get('/', authenticateToken, async (req, res) => {
  *       400:
  *         description: Errore di validazione
  */
-router.post('/', authenticateToken,  async(req, res) => {
+router.post('/', authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try {
         const percorso = new Percorso(req.body);
         percorso.created_by = req.user.userId;
@@ -137,7 +138,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
  *         description: Il percorso selezionato non è presente
  */
 
-router.patch("/:id", authenticateToken, async(req, res) => {
+router.patch("/:id", authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try {
         const updates = req.body;
         const options = { new: true }; // return the updated document
@@ -193,7 +194,7 @@ router.patch("/:id", authenticateToken, async(req, res) => {
  *       404:
  *         description: Il percorso selezionato non è presente
  */
-router.post("/:id/tappa", authenticateToken, async(req, res) => {
+router.post("/:id/tappa", authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try{
         const tappa = new Tappa(req.body);
         const percorso = await Percorso.findById(req.params.id);
@@ -229,7 +230,7 @@ router.post("/:id/tappa", authenticateToken, async(req, res) => {
  *       404:
  *         description: Il percorso selezionato non è presente
  */
-router.delete("/:id", authenticateToken, async(req, res) => {
+router.delete("/:id", authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try{
         const percorso = await Percorso.findByIdAndDelete(req.params.id)
          if (!percorso) {
@@ -268,7 +269,7 @@ router.delete("/:id", authenticateToken, async(req, res) => {
  *       404:
  *         description: Il percorso selezionato non è presente
  */
-router.delete("/:percorsoId/tappe/:tappaId", authenticateToken, async(req, res) => {
+router.delete("/:percorsoId/tappe/:tappaId", authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try{
         const percorso = await Percorso.findById(req.params.percorsoId)
         if (!percorso) {
@@ -332,7 +333,7 @@ router.delete("/:percorsoId/tappe/:tappaId", authenticateToken, async(req, res) 
  *         description: Il percorso selezionato non è presente
  */
 
-router.patch("/:percorsoId/tappe/:tappaId", authenticateToken, async(req, res) => {
+router.patch("/:percorsoId/tappe/:tappaId", authenticateToken, authorizeRole(['operatore', 'admin']), async(req, res) => {
     try {
         const updates = req.body;
         const options = { new: true, runValidators: true }; // return the updated document
