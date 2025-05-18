@@ -19,7 +19,7 @@ const TappaSchema = new mongoose.Schema({
         required: true
     }
 
-})
+}, { timestamps: true })
 
 const PercorsoSchema = new mongoose.Schema({
     name: {
@@ -52,7 +52,7 @@ const PercorsoSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     }
-});
+}, { timestamps: true });
 
 PercorsoSchema.methods.addTappa = async function(newTappa){
     this.tappe.push(newTappa);

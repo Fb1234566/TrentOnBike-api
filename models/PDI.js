@@ -28,6 +28,6 @@ const PdiScheda = new mongoose.Schema({
             "ALTRO"
         ]
     }
-})
+}, { timestamps: true })
 
 module.exports = mongoose.model("PDI", PdiScheda);
