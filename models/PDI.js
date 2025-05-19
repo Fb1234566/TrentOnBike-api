@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const PdiScheda = new mongoose.Schema({
+const PdiSchema = new mongoose.Schema({
     nome: {
         type: String,
         required: true,
@@ -30,4 +30,4 @@ const PdiScheda = new mongoose.Schema({
     }
 }, { timestamps: true })
 
-module.exports = mongoose.model("PDI", PdiScheda);
+module.exports = mongoose.model("PDI", PdiSchema);
