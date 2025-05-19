@@ -9,6 +9,70 @@ const authorizeRole = require('../middleware/authorizeRole');
 Percorsi Routes
 
 */
+/**
+ * @swagger
+ * tags:
+ *   name: Punti di Interesse
+ *   description: Gestione dei Punti Di Interesse
+ * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *   schemas:
+ *     Percorso:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         nome:
+ *           type: string
+ *         descrizione:
+ *           type: string
+ *         lunghezza:
+ *           type: string
+ *         difficolta:
+ *           type: string
+ *           format: date-time
+ *         tappe:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Tappa'
+ *         tipo:
+ *           type: string
+ *           enum: [TURISTICO, SUGGERITO_COMUNE, UTENTE]
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     Tappa:
+ *        type: object
+ *        properties:
+ *          _id:
+ *            type: string
+ *          ordine:
+ *            type: integer
+ *          descrizione:
+ *            type: string
+ *          posizione:
+ *            type: array
+ *            items:
+ *              type: number
+ *          puntoDiInteresse:
+ *            type: boolean
+ *          createdAt:
+ *            type: string
+ *            format: date-time
+ *          updatedAt:
+ *            type: string
+ *            format: date-time
+ *
+ * security:
+ *   - bearerAuth: []
+ */
 
 /**
  * @swagger
@@ -38,13 +102,13 @@ router.get('/', authenticateToken, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - name
- *               - description
+ *               - nome
+ *               - descrizione
  *             properties:
- *               name:
+ *               nome:
  *                 type: string
  *                 example: Castello Buon Consiglio
- *               description:
+ *               descrizione:
  *                 type: string
  *                 example: Il percorso termina al castello del buon consiglio
  *     responses:
@@ -80,8 +144,8 @@ router.post('/', authenticateToken, authorizeRole(['operatore', 'admin']), async
  *     responses:
  *       200:
  *         description: Percorso ottenuto con successo
- *       400:
- *         description: Errore di validazione
+ *       500:
+ *         description: Errore del server
  *       404:
  *         description: Il percorso selezionato non è presente
  */
@@ -123,10 +187,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               nome:
  *                 type: string
  *                 example: "Muse"
- *               description:
+ *               descrizione:
  *                 type: string
  *                 example: "Il percorso termina al Muse"
  *     responses:

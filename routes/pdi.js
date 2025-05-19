@@ -9,6 +9,38 @@ const authorizeRole = require('../middleware/authorizeRole');
 PDIs Routes
 
 */
+/**
+ * @swagger
+ * tags:
+ *   name: Percorsi
+ *   description: Gestione dei Percorsi, delle Tappe e dei punti di interesse
+ * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *   schemas:
+ *     PDI:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         nome:
+ *           type: string
+ *         descrizione:
+ *           type: string
+ *         posizione:
+ *           type: array
+ *           items:
+ *             type: number
+ *         tipoPoi:
+ *           type: string
+ *           enum: [RASTRELLIERA, OFFICINA, FONTANELLA, PUNTO_RICARICA, MUSEO, MONUMENTO, LUOGO_STORICO_CULTURALE, ALTRO]
+ *
+ * security:
+ *   - bearerAuth: []
+ */
 
 /**
  * @swagger
