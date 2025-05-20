@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const pdiRoutes = require('./routes/pdi');
 const percorsoRoutes = require('./routes/percorsi');
 const segnalazioniRoutes = require('./routes/segnalazioni');
+const gruppiSegnalazioniRoutes = require('./routes/gruppiSegnalazioni');
 
 // mongoose
 const mongoose = require('mongoose');
@@ -71,6 +72,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/pdi", pdiRoutes); 
 app.use("/api/v1/percorsi", percorsoRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoutes);
+app.use('/api/v1/gruppiSegnalazioni', gruppiSegnalazioniRoutes);
 
 app.listen(port, () => {
     console.log(`TrentOnBike API listening on http://localhost:${port}`);

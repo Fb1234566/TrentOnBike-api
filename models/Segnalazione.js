@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const PosizioneSchema = require("./schemas/Posizione");
 
 const SegnalazioneSchema = new mongoose.Schema({
     utente: {
@@ -7,19 +8,18 @@ const SegnalazioneSchema = new mongoose.Schema({
         required: true
     },
     posizione: {
-        type: {
-            type: String,
-            enum: ['Point'],
-            default: 'Point'
-        },
-        coordinates: {
-            type: [Number], // [longitude, latitude]
-            required: true
-        }
+        type: PosizioneSchema,
+        required: true
     },
     categoria: {
         type: String,
-        enum: ['BUCA', 'PISTA_DANNEGGIATA', 'SEGNALAZIONE_STRADALE_MANCANTE', 'ALTRO'],
+        enum: [
+            'OSTACOLO',
+            'ILLUMINAZIONE_INSUFFICIENTE',
+            'PISTA_DANNEGGIATA',
+            'SEGNALAZIONE_STRADALE_MANCANTE',
+            'ALTRO'
+        ],
         required: true
     },
     descrizione: {
@@ -28,8 +28,8 @@ const SegnalazioneSchema = new mongoose.Schema({
     },
     stato: {
         type: String,
-        enum: ['ATTIVA', 'RISOLTA', 'SCARTATA'],
-        default: 'ATTIVA'
+        enum: ['DA_VERIFICARE', 'ATTIVA', 'RISOLTA', 'SCARTATA'],
+        default: 'DA_VERIFICARE'
     },
     creataIl: {
         type: Date,
@@ -42,6 +42,14 @@ const SegnalazioneSchema = new mongoose.Schema({
     lettaDalComune: {
         type: Boolean,
         default: false
+    },
+    commento: {
+        type: String // testo libero inserito dall'operatore
+    },
+    gruppoSegnalazioni: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GruppoSegnalazioni',
+        default: null
     }
 });
 
