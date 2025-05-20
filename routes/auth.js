@@ -85,7 +85,7 @@ router.post('/register', async (req, res) => {
         await savedUser.save();
 
         // Genera token JWT
-        const payload = { userId: savedUser._id, ruolo: user.ruolo};   //modificato: genera token anche a partire dal ruolo dell'utente
+        const payload = { userId: savedUser._id, ruolo: savedUser.ruolo};   //modificato: genera token anche a partire dal ruolo dell'utente
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         // Rimuovi passwordHash dalla risposta
