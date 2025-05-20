@@ -1,9 +1,1619 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: TrentOnBike
-  description: TrentOnBike API
-  version: 1.0.0
+  title: TrentOnBike API
+  version: '1.0.1'
+  description: API per la gestione di utenti, segnalazioni, percorsi, punti di interesse e gruppi di segnalazioni per l'applicazione TrentOnBike. Documentazione basata su modelli Mongoose e specifiche di progetto.
 servers:
-  - url: 'https://localhost:3000'
+  - url: https://trentonbike.onrender.com/api
+    description: Development server
+tags:
+  - name: Auth
+    description: Autenticazione e registrazione utenti
+  - name: Users
+    description: Gestione utenti, statistiche e impostazioni
+  - name: Segnalazioni
+    description: Gestione delle segnalazioni da parte degli utenti e del comune
+  - name: GruppiSegnalazioni
+    description: Endpoint per la gestione dei gruppi di segnalazioni
+  - name: Punti di Interesse
+    description: Gestione dei Punti Di Interesse (PDI)
+  - name: Percorsi
+    description: Gestione dei Percorsi e delle Tappe
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        error:
+          type: string
+          nullable: true
+    PosizioneGeoJSON: 
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [Point]
+          default: Point
+        coordinates: # [longitude, latitude]
+          type: array
+          items:
+            type: number
+            format: double
+          minItems: 2
+          maxItems: 2
+          example: [-73.985428, 40.748817]
+        via:
+          type: string
+          nullable: true
+          description: Nome della via (opzionale)
+    PosizioneArray:
+      type: array
+      items:
+        type: number
+        format: double
+      minItems: 2
+      maxItems: 2
+      description: "Array di coordinate [longitudine, latitudine]"
+      example: [11.12345, 46.06789]
+
+    # Auth Schemas
+    UserAuthRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        password:
+          type: string
+          example: password123
+    UserRegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - nome
+      properties:
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        password:
+          type: string
+          example: password123
+        nome:
+          type: string
+          example: Mario
+        cognome:
+          type: string
+          example: Rossi
+          nullable: true
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        token:
+          type: string
+        message:
+          type: string
+
+    # User Schemas
+    UserBase: # For internal reference, not directly exposed with passwordHash
+      type: object
+      required:
+        - email
+        - ruolo
+      properties:
+        _id:
+          type: string
+          format: objectId
+        email:
+          type: string
+          format: email
+        nome:
+          type: string
+          nullable: true
+        cognome:
+          type: string
+          nullable: true
+        ruolo:
+          type: string
+          enum: ['utente', 'operatore', 'admin']
+          default: 'utente'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserBase'
+        - type: object
+          properties:
+            statistiche:
+              type: string 
+              format: objectId
+              nullable: true
+            impostazioni:
+              type: string 
+              format: objectId
+              nullable: true
+    UserPopulatedResponse:
+       allOf:
+        - $ref: '#/components/schemas/UserBase'
+        - type: object
+          properties:
+            statistiche:
+              $ref: '#/components/schemas/StatisticheUtente'
+            impostazioni:
+              $ref: '#/components/schemas/ImpostazioniUtente'
+    ImpostazioniUtente:
+      type: object
+      required:
+        - utente
+      properties:
+        _id:
+          type: string
+          format: objectId
+        utente:
+          type: string
+          format: objectId
+        lingua:
+          type: string
+          enum: [it, en, de]
+          default: it
+        tema:
+          type: string
+          enum: [CHIARO, SCURO] 
+          default: CHIARO      
+        notifichePOIVicini:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    StatisticheUtente:
+      type: object
+      required:
+        - utente
+      properties:
+        _id:
+          type: string
+          format: objectId
+        utente:
+          type: string
+          format: objectId
+        kmTotali:
+          type: number
+          format: double
+          default: 0
+        calorieTotali:
+          type: number
+          format: double 
+          default: 0
+        co2RisparmiatoTotale:
+          type: number
+          format: double
+          default: 0
+        velocitaMediaGenerale:
+          type: number
+          format: double
+          default: 0
+        sessioni:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessioneCiclismo'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SessioneCiclismo:
+      type: object
+      properties:
+        _id: 
+          type: string
+          format: objectId
+        dataOraInizio:
+          type: string
+          format: date-time
+          default: "now" 
+        dataOraFine:
+          type: string
+          format: date-time
+          nullable: true
+        distanzaKm:
+          type: number
+          format: double
+          default: 0
+        percorsoEffettuato:
+          type: string
+          format: objectId
+          nullable: true
+          description: Riferimento al modello Percorso
+        velocitaMedia: 
+          type: number
+          format: double
+          default: 0
+        calorieBruciate:
+          type: number
+          format: double
+          default: 0
+        co2Risparmiato:
+          type: number
+          format: double
+          default: 0
+    SessioneCiclismoInput: 
+      type: object
+      properties:
+        dataOraInizio:
+          type: string
+          format: date-time
+          description: "Opzionale, default al momento della creazione"
+        dataOraFine:
+          type: string
+          format: date-time
+        distanzaKm:
+          type: number
+          format: double
+        percorsoEffettuato:
+          type: string
+          format: objectId
+          nullable: true
+        velocitaMedia:
+          type: number
+          format: double
+        calorieBruciate:
+          type: number
+          format: double
+        co2Risparmiato:
+          type: number
+          format: double
+    OperatorRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+        - nome
+      properties:
+        email:
+          type: string
+          format: email
+          example: operatore@comune.it
+        password:
+          type: string
+          example: sicura123
+        nome:
+          type: string
+          example: Mario
+        cognome:
+          type: string
+          example: Rossi
+          nullable: true
+
+    # Segnalazioni Schemas
+    Segnalazione:
+      type: object
+      required:
+        - utente
+        - posizione
+        - categoria
+        - descrizione
+      properties:
+        _id:
+          type: string
+          format: objectId
+        utente:
+          type: string
+          format: objectId
+        posizione:
+          $ref: '#/components/schemas/PosizioneGeoJSON'
+        categoria:
+          type: string
+          enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
+        descrizione:
+          type: string
+        stato:
+          type: string
+          enum: [DA_VERIFICARE, ATTIVA, RISOLTA, SCARTATA]
+          default: DA_VERIFICARE
+        creataIl:
+          type: string
+          format: date-time
+          default: "now"
+        ultimaModificaIl:
+          type: string
+          format: date-time
+          default: "now"
+        lettaDalComune:
+          type: boolean
+          default: false
+        commento:
+          type: string
+          nullable: true
+        gruppoSegnalazioni:
+          type: string
+          format: objectId
+          nullable: true
+          default: null
+    SegnalazioneInput:
+      type: object
+      required: [categoria, descrizione, posizione]
+      properties:
+        categoria:
+          type: string
+          enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneGeoJSON'
+    SegnalazioneUtenteView:
+      type: object
+      properties:
+        _id:
+          type: string
+          format: objectId
+        categoria:
+          type: string
+          enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneGeoJSON'
+        stato:
+          type: string
+          enum: [DA_VERIFICARE, ATTIVA, RISOLTA, SCARTATA]
+        creataIl:
+          type: string
+          format: date-time
+        ultimaModificaIl:
+          type: string
+          format: date-time
+
+    SegnalazioneCommentoInput:
+      type: object
+      required: [commento]
+      properties:
+        commento:
+          type: string
+    SegnalazioneStatoInput:
+      type: object
+      required: [stato]
+      properties:
+        stato:
+          type: string
+          enum: [DA_VERIFICARE, ATTIVA, RISOLTA, SCARTATA]
+    SegnalazioneGruppoInput:
+      type: object
+      properties:
+        gruppoSegnalazioni:
+          type: string
+          format: objectId
+          nullable: true
+          description: ID del gruppo da associare, oppure null per rimuovere
+
+    # GruppiSegnalazioni Schemas
+    GruppoSegnalazioni:
+      type: object
+      required:
+        - nome
+        - posizione
+      properties:
+        _id:
+          type: string
+          format: objectId
+        nome:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneGeoJSON'
+        creatoDa:
+          type: string
+          format: objectId
+          nullable: true
+        creatoIl:
+          type: string
+          format: date-time
+          default: "now"
+        ultimaModificaIl:
+          type: string
+          format: date-time
+          default: "now"
+        numeroSegnalazioni:
+          type: integer
+          default: 0
+    GruppoSegnalazioniInput:
+      type: object
+      required:
+        - segnalazioni # Array of Segnalazione IDs
+      properties:
+        nome:
+          type: string
+          description: Nome del gruppo (opzionale, altrimenti autogenerato)
+          nullable: true
+        segnalazioni:
+          type: array
+          items:
+            type: string
+            format: objectId
+          minItems: 1
+    GruppoSegnalazioniNomeInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          description: Nuovo nome del gruppo (opzionale, se nullo viene autogenerato)
+          nullable: true
+
+    # PDI Schemas
+    PDI:
+      type: object
+      required:
+        - nome
+        - descrizione
+        - posizione
+        - tipoPoi
+      properties:
+        _id:
+          type: string
+          format: objectId
+        nome:
+          type: string
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneArray'
+        tipoPoi:
+          type: string
+          enum: [RASTRELLIERA, OFFICINA, FONTANELLA, PUNTO_RICARICA, MUSEO, MONUMENTO, LUOGO_STORICO_CULTURALE, ALTRO]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PDIInput:
+      type: object
+      required:
+        - nome
+        - descrizione
+        - posizione
+        - tipoPoi
+      properties:
+        nome:
+          type: string
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneArray'
+        tipoPoi:
+          type: string
+          enum: [RASTRELLIERA, OFFICINA, FONTANELLA, PUNTO_RICARICA, MUSEO, MONUMENTO, LUOGO_STORICO_CULTURALE, ALTRO]
+
+    # Percorsi Schemas
+    Tappa:
+      type: object
+      required:
+        - ordine
+        - descrizione
+        - posizione
+        - puntoDiInteresse
+      properties:
+        _id:
+          type: string
+          format: objectId
+        ordine:
+          type: integer
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneArray' 
+        puntoDiInteresse: # ID of a PDI
+          type: string
+          format: objectId
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Percorso:
+      type: object
+      required:
+        - nome
+        - descrizione
+        - createdBy
+      properties:
+        _id:
+          type: string
+          format: objectId
+        nome:
+          type: string
+        descrizione:
+          type: string
+        tipo:
+          type: string
+          enum: [TURISTICO, SUGGERITO_COMUNE, UTENTE]
+          default: TURISTICO
+        lunghezza:
+          type: number
+          format: double
+          default: 1
+          description: Lunghezza del percorso in km
+        difficolta:
+          type: string
+          enum: [Facile, Medio, Difficile]
+          default: Facile
+        tappe:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tappa' 
+        createdBy:
+          type: string
+          format: objectId
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PercorsoInput:
+      type: object
+      required:
+        - nome
+        - descrizione
+      properties:
+        nome:
+          type: string
+          example: Castello Buon Consiglio
+        descrizione:
+          type: string
+          example: Il percorso termina al castello del buon consiglio
+        tipo:
+          type: string
+          enum: [TURISTICO, SUGGERITO_COMUNE, UTENTE]
+        lunghezza:
+          type: number
+          format: double
+        difficolta:
+          type: string
+          enum: [Facile, Medio, Difficile]
+
+    TappaInput:
+      type: object
+      required:
+        - ordine
+        - descrizione
+        - posizione
+        - puntoDiInteresse
+      properties:
+        ordine:
+          type: integer
+          example: 0
+        descrizione:
+          type: string
+          example: "Tappa al Muse"
+        posizione:
+          $ref: '#/components/schemas/PosizioneArray' 
+        puntoDiInteresse:
+          type: string
+          format: objectId
+    TappaUpdateInput: 
+       type: object
+       properties:
+        ordine:
+          type: integer
+        descrizione:
+          type: string
+        posizione:
+          $ref: '#/components/schemas/PosizioneArray'
+        puntoDiInteresse:
+          type: string
+          format: objectId
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: [] 
+
 paths:
-  
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registra un nuovo utente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+      responses:
+        '201':
+          description: Utente registrato con successo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Errore di validazione o utente già esistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Errore del server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Effettua il login di un utente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAuthRequest'
+      responses:
+        '200':
+          description: Login effettuato con successo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse' 
+        '400':
+          description: Email o password mancanti.
+        '401':
+          description: Credenziali non valide.
+        '500':
+          description: Errore del server.
+
+  # User Endpoints
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Ottieni i dettagli dell'utente autenticato (con statistiche e impostazioni popolate)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dettagli dell'utente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPopulatedResponse'
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Utente non trovato.
+        '500':
+          description: Errore del server.
+    put:
+      tags: [Users]
+      summary: Aggiorna il profilo dell'utente autenticato (nome, cognome)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true # Though fields inside are optional
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                  nullable: true
+                cognome:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Profilo utente aggiornato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse' # Returns non-populated User
+        '400':
+          description: Dati non validi.
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Utente non trovato.
+  /users/me/impostazioni:
+    get:
+      tags: [Users]
+      summary: Ottieni le impostazioni dell'utente autenticato
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Impostazioni utente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpostazioniUtente'
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Impostazioni non trovate.
+    put:
+      tags: [Users]
+      summary: Aggiorna le impostazioni dell'utente autenticato
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true # Though fields inside are optional
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lingua:
+                  type: string
+                  enum: [it, en, de]
+                tema:
+                  type: string
+                  enum: [CHIARO, SCURO] 
+                notifichePOIVicini:
+                  type: boolean
+      responses:
+        '200':
+          description: Impostazioni aggiornate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpostazioniUtente'
+        '400':
+          description: Dati non validi.
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Impostazioni utente non trovate.
+  /users/me/statistiche:
+    get:
+      tags: [Users]
+      summary: Ottieni le statistiche dell'utente autenticato
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Statistiche utente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatisticheUtente'
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Statistiche non trovate.
+  /users/me/statistiche/sessioni:
+    post:
+      tags: [Users]
+      summary: Aggiunge una nuova sessione di ciclismo alle statistiche dell'utente
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessioneCiclismoInput'
+      responses:
+        '201':
+          description: Sessione aggiunta e statistiche aggiornate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatisticheUtente'
+        '400':
+          description: Dati della sessione non validi.
+        '401':
+          description: Non autorizzato.
+        '404':
+          description: Statistiche utente non trovate.
+  /users/: 
+    get:
+      tags: [Users]
+      summary: Ottieni tutti gli utenti (solo per admin)
+      description: Accessibile solo dagli amministratori. Restituisce una lista limitata di campi per utente.
+      security:
+        - BearerAuth: [] 
+      responses:
+        '200':
+          description: Lista degli utenti.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Non autorizzato.
+        '403':
+          description: Accesso negato (non admin).
+  /users/{id}/promuovi:
+    patch:
+      tags: [Users]
+      summary: Promuove un utente al ruolo 'operatore' (solo admin)
+      description: Accessibile solo dagli amministratori.
+      security:
+        - BearerAuth: [] # authorizeRole(['admin'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID dell'utente da promuovere.
+          schema:
+            type: string
+            format: objectId
+      responses:
+        '200':
+          description: Utente promosso correttamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Non autorizzato.
+        '403':
+          description: Accesso negato.
+        '404':
+          description: Utente non trovato.
+        '500':
+          description: Errore del server.
+  /users/register-operator:
+    post:
+      tags: [Users]
+      summary: Registra un nuovo operatore (solo admin)
+      description: Accessibile solo dagli amministratori.
+      security:
+        - BearerAuth: [] # authorizeRole(['admin'])
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperatorRegistrationRequest'
+      responses:
+        '201':
+          description: Operatore registrato con successo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Dati non validi o email già in uso.
+        '403':
+          description: Accesso negato (non admin).
+        '500':
+          description: Errore del server.
+  /segnalazioni:
+    post:
+      tags: [Segnalazioni]
+      summary: Crea una nuova segnalazione
+      description: Accessibile solo da utenti autenticati con ruolo 'utente'.
+      security:
+        - BearerAuth: [] # authorizeRole(['utente'])
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegnalazioneInput'
+      responses:
+        '201':
+          description: Segnalazione creata con successo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Segnalazione'
+        '400':
+          description: Dati mancanti o non validi.
+        '500':
+          description: Errore interno del server.
+    get:
+      tags: [Segnalazioni]
+      summary: Ottieni tutte le segnalazioni con filtri (per operatore e admin)
+      description: Accessibile da utenti con ruolo 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] 
+      parameters:
+        - name: stati
+          in: query
+          description: Filtra per uno o più stati (es. DA_VERIFICARE,ATTIVA)
+          required: false
+          schema: { type: string }
+        - name: categorie
+          in: query
+          description: Filtra per una o più categorie (es. OSTACOLO,ALTRO)
+          required: false
+          schema: { type: string }
+        - name: daData
+          in: query
+          description: Data inizio (ISO 8601)
+          required: false
+          schema: { type: string, format: date-time }
+        - name: aData
+          in: query
+          description: Data fine (ISO 8601)
+          required: false
+          schema: { type: string, format: date-time }
+        - name: lettaDalComune
+          in: query
+          description: Filtra per segnalazioni lette (true) o non lette (false)
+          required: false
+          schema: { type: boolean }
+        - name: gruppoSegnalazioni
+          in: query
+          description: Filtra per segnalazioni con gruppo (true) o senza (false)
+          required: false
+          schema: { type: boolean }
+        - name: via
+          in: query
+          description: Filtra per via esatta
+          required: false
+          schema: { type: string }
+        - name: lat
+          in: query
+          description: Latitudine per ricerca geospaziale (richiede lng)
+          required: false
+          schema: { type: number, format: double }
+        - name: lng
+          in: query
+          description: Longitudine per ricerca geospaziale (richiede lat)
+          required: false
+          schema: { type: number, format: double }
+        - name: raggio
+          in: query
+          description: Raggio in metri per ricerca geospaziale (default 1000)
+          required: false
+          schema: { type: integer, default: 1000 }
+        - name: ordine
+          in: query
+          description: Campo per ordinamento (es. creataIl)
+          required: false
+          schema: { type: string, enum: [creataIl, ultimaModificaIl, stato, categoria] }
+        - name: direction
+          in: query
+          description: Direzione ordinamento
+          required: false
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - name: limit
+          in: query
+          description: Numero massimo di risultati (obbligatorio).
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista delle segnalazioni.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Segnalazione'
+        '400':
+          description: Parametro non valido.
+        '500':
+          description: Errore interno del server.
+  /segnalazioni/mie:
+    get:
+      tags: [Segnalazioni]
+      summary: Ottieni tutte le segnalazioni dell'utente autenticato
+      description: Accessibile solo da utenti autenticati con ruolo 'utente'. Campi limitati.
+      security:
+        - BearerAuth: [] # authorizeRole(['utente'])
+      parameters:
+        - name: stati
+          in: query
+          schema: { type: string }
+        - name: categorie
+          in: query
+          schema: { type: string }
+        - name: daData
+          in: query
+          schema: { type: string, format: date-time }
+        - name: aData
+          in: query
+          schema: { type: string, format: date-time }
+        - name: ordine
+          in: query
+          schema: { type: string, enum: [creataIl] }
+        - name: direction
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - name: limit
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista delle segnalazioni dell'utente (vista limitata).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SegnalazioneUtenteView'
+        '400':
+          description: Parametro non valido.
+        '500':
+          description: Errore interno del server.
+  /segnalazioni/{id}/commento:
+    patch:
+      tags: [Segnalazioni]
+      summary: Aggiunge o modifica il commento dell'operatore
+      description: Accessibile solo da utenti con ruolo 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegnalazioneCommentoInput'
+      responses:
+        '200':
+          description: Commento aggiornato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Segnalazione'
+        '400':
+          description: Dati non validi.
+        '404':
+          description: Segnalazione non trovata.
+        '500':
+          description: Errore interno del server.
+  /segnalazioni/{id}/stato:
+    patch:
+      tags: [Segnalazioni]
+      summary: Aggiorna lo stato di una segnalazione (e del gruppo)
+      description: Accessibile solo da utenti con ruolo 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegnalazioneStatoInput'
+      responses:
+        '200':
+          description: Stato aggiornato con successo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  segnalazione: { $ref: '#/components/schemas/Segnalazione', nullable: true }
+                  modifiedCount: { type: integer, nullable: true, description: "Numero di segnalazioni aggiornate nel gruppo"}
+        '400':
+          description: Stato non valido.
+        '404':
+          description: Segnalazione non trovata.
+        '500':
+          description: Errore interno del server.
+  /segnalazioni/{id}/lettura:
+    patch:
+      tags: [Segnalazioni]
+      summary: Segna una segnalazione come letta dal Comune
+      description: Accessibile solo da utenti con ruolo 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Segnalazione marcata come letta.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  segnalazione: { $ref: '#/components/schemas/Segnalazione' }
+        '404':
+          description: Segnalazione non trovata.
+        '500':
+          description: Errore interno del server.
+  /segnalazioni/{id}/gruppoSegnalazioni:
+    patch:
+      tags: [Segnalazioni]
+      summary: Aggiunge o rimuove una segnalazione da un gruppo
+      description: Accessibile solo da utenti con ruolo 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegnalazioneGruppoInput'
+      responses:
+        '200':
+          description: Gruppo associato/rimosso correttamente.
+          content: { application/json: { schema: { type: object, properties: { message: { type: string }}}}}
+        '400':
+          description: Dati non validi o conflitto di stato.
+        '404':
+          description: Segnalazione o gruppo non trovati.
+        '500':
+          description: Errore interno del server.
+
+  # GruppiSegnalazioni Endpoints (ensure request/response schemas match models)
+  /gruppiSegnalazioni:
+    post:
+      tags: [GruppiSegnalazioni]
+      summary: Crea un nuovo gruppo di segnalazioni
+      description: Accessibile solo da utenti con ruolo 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GruppoSegnalazioniInput'
+      responses:
+        '201':
+          description: Gruppo creato con successo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  gruppo: { $ref: '#/components/schemas/GruppoSegnalazioni' }
+        '400':
+          description: Dati non validi o stato segnalazioni non compatibile.
+        '500':
+          description: Errore interno del server.
+    get:
+      tags: [GruppiSegnalazioni]
+      summary: Restituisce l'elenco dei gruppi di segnalazioni con filtri
+      description: Accessibile da utenti con ruolo 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      parameters: # Parameters as defined in JSDoc, verified against code logic
+        - name: daData
+          in: query
+          schema: { type: string, format: date-time }
+        - name: aData
+          in: query
+          schema: { type: string, format: date-time }
+        - name: numero
+          in: query
+          schema: { type: integer }
+        - name: minNumero
+          in: query
+          schema: { type: integer }
+        - name: maxNumero
+          in: query
+          schema: { type: integer }
+        - name: via 
+          in: query 
+          description: Filtra per via (se il campo 'posizione.via' fosse presente nel gruppo).
+          schema: { type: string }
+        - name: lat
+          in: query
+          schema: { type: number, format: double }
+        - name: lng
+          in: query
+          schema: { type: number, format: double }
+        - name: raggio
+          in: query
+          schema: { type: integer, default: 1000 }
+        - name: ordine
+          in: query
+          schema: { type: string }
+        - name: direction
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc } 
+        - name: limit
+          in: query
+          required: true # Code requires valid limit
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista dei gruppi.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GruppoSegnalazioni'
+        '400':
+          description: Parametri non validi.
+        '500':
+          description: Errore interno del server.
+  /gruppiSegnalazioni/{id}:
+    get:
+      tags: [GruppiSegnalazioni]
+      summary: Dettagli di un gruppo di segnalazioni
+      description: Accessibile da 'operatore' o 'admin'. Non include segnalazioni associate.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del gruppo.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Dati del gruppo.
+          content: { application/json: { schema: { $ref: '#/components/schemas/GruppoSegnalazioni' }}}
+        '404':
+          description: Gruppo non trovato.
+        '500':
+          description: Errore interno del server.
+    delete:
+      tags: [GruppiSegnalazioni]
+      summary: Elimina un gruppo di segnalazioni
+      description: Accessibile solo da 'operatore'. Scollega segnalazioni associate.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del gruppo.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Gruppo eliminato.
+          content: { application/json: { schema: { type: object, properties: { message: { type: string }}}}}
+        '404':
+          description: Gruppo non trovato.
+        '500':
+          description: Errore interno del server.
+  /gruppiSegnalazioni/{id}/nome:
+    patch:
+      tags: [GruppiSegnalazioni]
+      summary: Modifica il nome di un gruppo di segnalazioni
+      description: Accessibile solo da 'operatore'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del gruppo.
+          schema: { type: string, format: objectId }
+      requestBody:
+        content: # requestBody is optional in JSDoc, but code requires it if 'nome' is to be changed.
+          application/json: # If body is empty, nome is autogenerated.
+            schema:
+              $ref: '#/components/schemas/GruppoSegnalazioniNomeInput'
+      responses:
+        '200':
+          description: Nome modificato.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  gruppo: { $ref: '#/components/schemas/GruppoSegnalazioni' }
+        '400':
+          description: Nome già esistente o dati non validi.
+        '404':
+          description: Gruppo non trovato.
+        '500':
+          description: Errore interno del server.
+
+  # PDI Endpoints
+  /pdi:
+    get:
+      tags: [Punti di Interesse]
+      summary: Get all PDI
+      description: Accessibile da utenti autenticati.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista dei punti di interesse.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PDI'
+    post:
+      tags: [Punti di Interesse]
+      summary: Create a new PDI
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(["operatore","admin"])
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PDIInput'
+      responses:
+        '201':
+          description: PDI creato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/PDI' }}}
+        '400':
+          description: Errore di validazione.
+  /pdi/{id}:
+    patch:
+      tags: [Punti di Interesse]
+      summary: Modifica un PDI
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(["operatore","admin"])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del PDI.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PDIInput' # Can be partial, model fields are not all required for update
+      responses:
+        '200':
+          description: PDI aggiornato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/PDI' }}}
+        '400':
+          description: Errore di validazione.
+        '404':
+          description: PDI non trovato.
+    delete:
+      tags: [Punti di Interesse]
+      summary: Rimuove un PDI
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(["operatore","admin"])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del PDI.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: PDI cancellato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/PDI' }}} # Returns deleted PDI
+        '404':
+          description: PDI non trovato.
+        '500':
+          description: Errore sul server.
+
+  # Percorsi Endpoints
+  /percorsi:
+    get:
+      tags: [Percorsi]
+      summary: Ottiene tutti i percorsi
+      description: Accessibile da utenti autenticati.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista dei percorsi.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Percorso' 
+    post:
+      tags: [Percorsi]
+      summary: Crea un nuovo percorso
+      description: Accessibile da 'operatore' o 'admin'. `createdBy` is set to `req.user.userId`.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PercorsoInput'
+      responses:
+        '201':
+          description: Percorso creato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}}
+        '400':
+          description: Errore di validazione.
+  /percorsi/{id}:
+    get:
+      tags: [Percorsi]
+      summary: Ottiene i dettagli di un percorso
+      description: Accessibile da utenti autenticati. Popola 'createdBy' e 'tappe'.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Percorso ottenuto.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}}
+        '400':
+          description: Errore ID.
+        '404':
+          description: Percorso non trovato.
+    patch:
+      tags: [Percorsi]
+      summary: Aggiorna un percorso
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] 
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PercorsoInput' 
+      responses:
+        '200':
+          description: Percorso aggiornato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}}
+        '400':
+          description: Errore di validazione.
+        '404':
+          description: Percorso non trovato.
+    delete:
+      tags: [Percorsi]
+      summary: Rimuove un percorso
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Percorso cancellato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}} # Returns deleted
+        '404':
+          description: Percorso non trovato.
+        '500':
+          description: Errore sul server.
+  /percorsi/{id}/tappa: 
+    post:
+      tags: [Percorsi]
+      summary: Aggiunge una tappa a un percorso
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TappaInput'
+      responses:
+        '201':
+          description: Tappa aggiunta, restituisce percorso aggiornato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}}
+        '400':
+          description: Errore di validazione.
+        '404':
+          description: Percorso non trovato.
+  /percorsi/{percorsoId}/tappe/{tappaId}:
+    patch:
+      tags: [Percorsi]
+      summary: Aggiorna una tappa di un percorso
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: percorsoId
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+        - name: tappaId
+          in: path
+          required: true
+          description: ID della tappa.
+          schema: { type: string, format: objectId }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TappaUpdateInput'
+      responses:
+        '200':
+          description: Tappa aggiornata.
+          content: # Code returns updatedTappa directly, not the whole Percorso
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tappa'
+        '400':
+          description: Errore di validazione.
+        '404':
+          description: Percorso o Tappa non trovata.
+    delete:
+      tags: [Percorsi]
+      summary: Rimuove una tappa da un percorso
+      description: Accessibile da 'operatore' o 'admin'.
+      security:
+        - BearerAuth: [] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: percorsoId
+          in: path
+          required: true
+          description: ID del percorso.
+          schema: { type: string, format: objectId }
+        - name: tappaId
+          in: path
+          required: true
+          description: ID della tappa.
+          schema: { type: string, format: objectId }
+      responses:
+        '200':
+          description: Tappa rimossa, restituisce percorso aggiornato.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Percorso' }}}
+        '404':
+          description: Percorso o Tappa non trovata.
+        '500':
+          description: Errore sul server.
