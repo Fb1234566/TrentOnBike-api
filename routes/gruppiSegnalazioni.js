@@ -187,15 +187,91 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
         }
     });
 
-// GET restituisce tutti i gruppi di segnalazioni (senza includere le segnalazioni associate)
+// GET restituisce tutti i gruppi di segnalazioni (senza le segnalazioni associate) (solo operatore e admin) - disponibili filtri, ordinamento e limitazione
 /**
  * @swagger
  * /gruppiSegnalazioni:
  *   get:
- *     summary: Restituisce l'elenco di tutti i gruppi di segnalazioni (senza includere le segnalazioni associate)
+ *     summary: Restituisce l'elenco dei gruppi di segnalazioni con possibilità di filtro, ordinamento e limitazione
  *     tags: [Gruppi Segnalazioni]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: daData
+ *         in: query
+ *         description: Data di inizio per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: aData
+ *         in: query
+ *         description: Data di fine per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: numero
+ *         in: query
+ *         description: Filtra per gruppi con esattamente questo numero di segnalazioni
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: minNumero
+ *         in: query
+ *         description: Filtra per gruppi con almeno questo numero di segnalazioni
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: maxNumero
+ *         in: query
+ *         description: Filtra per gruppi con al massimo questo numero di segnalazioni
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: via
+ *         in: query
+ *         description: Filtra per gruppi che si trovano in una determinata via esatta
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: lat
+ *         in: query
+ *         description: Latitudine per il filtro geospaziale
+ *         required: false
+ *         schema:
+ *           type: number
+ *       - name: lng
+ *         in: query
+ *         description: Longitudine per il filtro geospaziale
+ *         required: false
+ *         schema:
+ *           type: number
+ *       - name: raggio
+ *         in: query
+ *         description: Raggio in metri entro cui cercare gruppi dalla posizione indicata (default 1000 metri)
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: ordine
+ *         in: query
+ *         description: Campo su cui ordinare i risultati (es. creatoIl, ultimaModificaIl, numeroSegnalazioni, ecc.)
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: direction
+ *         in: query
+ *         description: Direzione dell'ordinamento (ascendente o discendente)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *       - name: limit
+ *         in: query
+ *         description: Numero massimo di gruppi da restituire
+ *         required: true
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Lista dei gruppi di segnalazioni
@@ -205,6 +281,8 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/GruppoSegnalazioni'
+ *       400:
+ *         description: Parametri non validi
  *       401:
  *         description: Utente non autorizzato
  *       500:
@@ -212,7 +290,81 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
  */
 router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async (req, res) => {
     try {
-        const gruppi = await GruppoSegnalazioni.find().sort({ ultimaModificaIl: -1 });
+        let query = {};
+
+        // Filtro per data di creazione (range)
+        if (req.query.daData || req.query.aData) {
+            const daData = req.query.daData ? new Date(req.query.daData) : null;
+            const aData = req.query.aData ? new Date(req.query.aData) : null;
+
+            if (daData || aData) {
+                query.creatoIl = {};
+                if (daData) query.creatoIl.$gte = daData;
+                if (aData) query.creatoIl.$lte = aData;
+            }
+        }
+
+        // Filtro per numero di segnalazioni
+        if (req.query.numero) {
+            const numero = parseInt(req.query.numero);
+            if (isNaN(numero)) return res.status(400).json({ message: 'Parametro numero non valido' });
+            query.numeroSegnalazioni = numero;
+        } else {
+            const min = req.query.minNumero ? parseInt(req.query.minNumero) : null;
+            const max = req.query.maxNumero ? parseInt(req.query.maxNumero) : null;
+
+            if ((req.query.minNumero !== undefined && isNaN(min)) || (req.query.maxNumero !== undefined && isNaN(max))) {
+                return res.status(400).json({ message: 'Parametro minNumero o maxNumero non valido' });
+            }
+
+            if (min !== null || max !== null) {
+                query.numeroSegnalazioni = {};
+                if (min !== null) query.numeroSegnalazioni.$gte = min;
+                if (max !== null) query.numeroSegnalazioni.$lte = max;
+            }
+        }
+
+        // Filtro per posizione
+        if (req.query.via) {
+            query['posizione.via'] = req.query.via;
+        } else if (req.query.lat && req.query.lng) {
+            const lat = parseFloat(req.query.lat);
+            const lng = parseFloat(req.query.lng);
+            const raggio = parseInt(req.query.raggio) || 1000;
+
+            if (isNaN(lat) || isNaN(lng)) {
+                return res.status(400).json({ message: 'Latitudine o longitudine non valide' });
+            }
+
+            query.posizione = {
+                $geoWithin: {
+                    $centerSphere: [[lng, lat], raggio / 6378137] // raggio terrestre in metri
+                }
+            };
+        }
+
+        // Ordinamento
+        let sort = {};
+        if (req.query.ordine) {
+            const direction = req.query.direction === 'asc' ? 1 : -1;
+            sort[req.query.ordine] = direction;
+        } else {
+            // Default: ultima modifica più recente
+            sort['ultimaModificaIl'] = -1;
+        }
+
+        // Limitazione
+        let limit = parseInt(req.query.limit);
+        if (isNaN(limit) || limit < 1) {
+            return res.status(400).json({ message: 'Parametro limit non valido' });
+        }
+
+        // Query finale
+        const gruppi = await GruppoSegnalazioni
+            .find(query)
+            .sort(sort)
+            .limit(limit);
+
         res.status(200).json(gruppi);
     } catch (error) {
         console.error('Errore nel recupero dei gruppi di segnalazioni:', error);

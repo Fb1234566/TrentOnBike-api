@@ -5,12 +5,21 @@ const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
 
 /* I permessi dei vari endpoint seguono i principi di separazione dei ruoli e minimo privilegio:
-- utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato
-- operatore può:            visualizzare tutte le segnalazioni, segnarle come lette, cambiare il loro stato
+- utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato (non tutti i loro campi però)
+- operatore può:            visualizzare tutte le segnalazioni, segnarle come lette, cambiare il loro stato, aggiungere un commento
 - admin può:                visualizzare tutte le segnalazioni
 Admin ha il ruolo di supervisionare e configurare il sistema, non svolge le funzioni operative
 Admin può crearsi il suo utente con ruolo operatore se vuole gestire le segnalazioni
  */
+
+const categorieValide = [
+    'OSTACOLO',
+    'ILLUMINAZIONE_INSUFFICIENTE',
+    'PISTA_DANNEGGIATA',
+    'SEGNALAZIONE_STRADALE_MANCANTE',
+    'ALTRO'
+];
+const statiValidi = ['DA_VERIFICARE', 'ATTIVA', 'RISOLTA', 'SCARTATA'];
 
 /**
  * @swagger
@@ -118,6 +127,11 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
             return res.status(400).json({ message: 'Dati mancanti o incompleti.' });
         }
 
+        // controllo sulla categoria fornita
+        if (!categorieValide.includes(categoria)) {
+            return res.status(400).json({ message: 'Categoria non valida.' });
+        }
+
         //In futuro se implementato calcolo della via (riga da aggiungere):
         //const via = await getViaFromCoordinates(posizione.coordinates);
 
@@ -138,15 +152,62 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
     }
 });
 
-//GET ottiene tutte le segnalazioni create dall'utente autenticato (solo per utente)
+// GET ottiene tutte le segnalazioni create dall'utente autenticato (solo per utente) possibile filtrare e ordinare
 /**
  * @swagger
  * /segnalazioni/mie:
  *   get:
- *     summary: Ottieni tutte le segnalazioni dell'utente autenticato
+ *     summary: Ottieni tutte le segnalazioni dell'utente autenticato con possibilità di filtro per stato e categoria
  *     tags: [Segnalazioni]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: stati
+ *         in: query
+ *         description: Filtra le segnalazioni per uno o più stati (separati da virgola)
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: categorie
+ *         in: query
+ *         description: Filtra le segnalazioni per una o più categorie (separate da virgola)
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: daData
+ *         in: query
+ *         description: Data di inizio per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: aData
+ *         in: query
+ *         description: Data di fine per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: ordine
+ *         in: query
+ *         description: Ordinamento delle segnalazioni, può essere crescente o decrescente per uno dei campi disponibili
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [creatoIl]
+ *       - name: direction
+ *         in: query
+ *         description: Ordinamento crescente o decrescente
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *       - name: limit
+ *         in: query
+ *         description: Numero massimo di segnalazioni da visualizzare
+ *         required: false
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Lista delle segnalazioni dell'utente
@@ -156,46 +217,293 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Segnalazione'
+ *       400:
+ *         description: Parametro non valido
  *       500:
  *         description: Errore interno del server
  */
 router.get('/mie', authenticateToken, authorizeRole(['utente']), async (req, res) => {
     try {
-        //non restituisce il campo lettaDalComune all'utente (utilizzo select per filtrare i campi)
-        const segnalazioni = await Segnalazione.find({ utente: req.user.userId }).select('-lettaDalComune');
+        let query = { utente: req.user.userId };
+
+        // Filtro per stato (supporta lista separata da virgola o parametro ripetuto)
+        if (req.query.stati) {
+            const stati = Array.isArray(req.query.stati)
+                ? req.query.stati
+                : req.query.stati.split(',').map(s => s.trim());
+
+            // Controlla se i valori passati sono validi
+            for (let stato of stati) {
+                if (!statiValidi.includes(stato)) {
+                    return res.status(400).json({ message: `Stato non valido: ${stato}` });
+                }
+            }
+            query.stato = { $in: stati };
+        }
+
+        // Filtro per categoria (supporta lista separata da virgola o parametro ripetuto)
+        if (req.query.categorie) {
+            const categorie = Array.isArray(req.query.categorie)
+                ? req.query.categorie
+                : req.query.categorie.split(',').map(c => c.trim());
+
+            // Controlla se i valori passati sono validi
+            for (let categoria of categorie) {
+                if (!categorieValide.includes(categoria)) {
+                    return res.status(400).json({ message: `Categoria non valida: ${categoria}` });
+                }
+            }
+            query.categoria = { $in: categorie };
+        }
+
+        // Filtro per data di creazione (range)
+        if (req.query.daData || req.query.aData) {
+            const dataInizio = req.query.daData ? new Date(req.query.daData) : null;
+            const dataFine = req.query.aData ? new Date(req.query.aData) : null;
+            if (dataInizio || dataFine) {
+                query.creatoIl = {};
+                if (dataInizio) query.creatoIl.$gte = dataInizio;
+                if (dataFine) query.creatoIl.$lte = dataFine;
+            }
+        }
+
+        // Ordinamento
+        let sort = {};
+        if (req.query.ordine) {
+            const direction = req.query.direction === 'asc' ? 1 : -1; // 'asc' -> 1, 'desc' -> -1
+            sort[req.query.ordine] = direction;
+        } else {
+            // Se non è stato fornito un parametro di ordinamento, usa 'creatoIl' con direzione decrescente
+            sort['creatoIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
+        }
+
+        // Limitazione dei risultati
+        let limit = parseInt(req.query.limit);
+        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+
+        // Esegui la ricerca con filtri e ordinamento, limitando il numero di risultati
+        const segnalazioni = await Segnalazione
+            .find(query)
+            .sort(sort)
+            .limit(limit)
+            .select('-lettaDalComune -commento -gruppoSegnalazioni -utente');
+
         res.json(segnalazioni);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante il recupero delle segnalazioni' });
     }
 });
 
-//GET ottiene tutte le segnalazioni (solo per operatore e admin)
+// GET ottiene tutte le segnalazioni con possibilità di filtro, ordinamento e limitazione (per operatore e admin)
 /**
  * @swagger
  * /segnalazioni:
  *   get:
- *     summary: Ottieni tutte le segnalazioni (solo per operatore Comune e admin)
+ *     summary: Ottieni tutte le segnalazioni con possibilità di filtro per stato, categoria, lettaDalComune, gruppoSegnalazioni
  *     tags: [Segnalazioni]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: stati
+ *         in: query
+ *         description: Filtra le segnalazioni per uno o più stati (separati da virgola)
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: categorie
+ *         in: query
+ *         description: Filtra le segnalazioni per una o più categorie (separate da virgola)
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: daData
+ *         in: query
+ *         description: Data di inizio per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: aData
+ *         in: query
+ *         description: Data di fine per il filtro del range di creazione (formato ISO)
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - name: lettaDalComune
+ *         in: query
+ *         description: Filtra le segnalazioni che sono state lette o meno dal comune (true/false)
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *       - name: gruppoSegnalazioni
+ *         in: query
+ *         description: Filtra le segnalazioni che hanno un gruppo o che non lo hanno (true/false)
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *       - name: ordine
+ *         in: query
+ *         description: Ordinamento delle segnalazioni, può essere crescente o decrescente per uno dei campi disponibili
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: direction
+ *         in: query
+ *         description: Ordinamento crescente o decrescente
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *       - name: limit
+ *         in: query
+ *         description: Numero massimo di segnalazioni da visualizzare
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: via
+ *         in: query
+ *         description: Filtra le segnalazioni per via esatta
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: lat
+ *         in: query
+ *         description: Latitudine per il filtro geospaziale (richiede anche lng)
+ *         required: false
+ *         schema:
+ *           type: number
+ *       - name: lng
+ *         in: query
+ *         description: Longitudine per il filtro geospaziale (richiede anche lat)
+ *         required: false
+ *         schema:
+ *           type: number
+ *       - name: raggio
+ *         in: query
+ *         description: Raggio in metri entro cui cercare dalla posizione indicata
+ *         required: false
+ *         schema:
+ *           type: number
  *     responses:
  *       200:
- *         description: Lista di tutte le segnalazioni
+ *         description: Lista delle segnalazioni
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Segnalazione'
+ *       400:
+ *         description: Parametro non valido
  *       500:
  *         description: Errore interno del server
  */
 router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async (req, res) => {
     try {
-        const tutte = await Segnalazione.find().populate('utente', 'nome email');
-        res.json(tutte);
+        let query = {};
+
+        // Filtro per stato (supporta lista separata da virgola o parametro ripetuto)
+        if (req.query.stati) {
+            const stati = Array.isArray(req.query.stati)
+                ? req.query.stati
+                : req.query.stati.split(',').map(s => s.trim());
+
+            // Controlla se i valori passati sono validi
+            for (let stato of stati) {
+                if (!statiValidi.includes(stato)) {
+                    return res.status(400).json({ message: `Stato non valido: ${stato}` });
+                }
+            }
+            query.stato = { $in: stati };
+        }
+
+        // Filtro per categoria (supporta lista separata da virgola o parametro ripetuto)
+        if (req.query.categorie) {
+            const categorie = Array.isArray(req.query.categorie)
+                ? req.query.categorie
+                : req.query.categorie.split(',').map(c => c.trim());
+
+            // Controlla se i valori passati sono validi
+            for (let categoria of categorie) {
+                if (!categorieValide.includes(categoria)) {
+                    return res.status(400).json({ message: `Categoria non valida: ${categoria}` });
+                }
+            }
+            query.categoria = { $in: categorie };
+        }
+
+        // Filtro per data di creazione (range)
+        if (req.query.daData || req.query.aData) {
+            const dataInizio = req.query.daData ? new Date(req.query.daData) : null;
+            const dataFine = req.query.aData ? new Date(req.query.aData) : null;
+            if (dataInizio || dataFine) {
+                query.creatoIl = {};
+                if (dataInizio) query.creatoIl.$gte = dataInizio;
+                if (dataFine) query.creatoIl.$lte = dataFine;
+            }
+        }
+
+        // Filtro per lettaDalComune
+        if (req.query.lettaDalComune !== undefined) {
+            query.lettaDalComune = req.query.lettaDalComune === 'true'; // True o False
+        }
+
+        // Filtro per gruppoSegnalazioni
+        if (req.query.gruppoSegnalazioni !== undefined) {
+            if (req.query.gruppoSegnalazioni === 'true') {
+                // Se il parametro è 'true', prendi segnalazioni che hanno un gruppo (gruppoSegnalazioni !== null)
+                query.gruppoSegnalazioni = { $ne: null };
+            } else if (req.query.gruppoSegnalazioni === 'false') {
+                // Se il parametro è 'false', prendi segnalazioni senza un gruppo (gruppoSegnalazioni === null)
+                query.gruppoSegnalazioni = null;
+            }
+        }
+
+        // Filtro per posizione geografica (se viene fornita la via, ignora eventuali coordinate)
+        if (req.query.via) {
+            query['posizione.via'] = req.query.via;
+        } else if (req.query.lat && req.query.lng) {
+            const lat = parseFloat(req.query.lat);
+            const lng = parseFloat(req.query.lng);
+            const raggio = parseInt(req.query.raggio) || 1000; // default 1000 metri
+
+            if (isNaN(lat) || isNaN(lng)) {
+                return res.status(400).json({ message: 'Latitudine o longitudine non valide' });
+            }
+
+            // Cerca entro un certo raggio usando $geoWithin con $centerSphere
+            query.posizione = {
+                $geoWithin: {
+                    $centerSphere: [[lng, lat], raggio / 6378137]  // raggio in radianti (raggio terrestre ~6378137 m)
+                }
+            };
+        }
+
+        // Ordinamento
+        let sort = {};
+        if (req.query.ordine) {
+            const direction = req.query.direction === 'asc' ? 1 : -1; // 'asc' -> 1, 'desc' -> -1
+            sort[req.query.ordine] = direction;
+        } else {
+            // Se non è stato fornito un parametro di ordinamento, usa 'creatoIl' con direzione decrescente
+            sort['creatoIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
+        }
+
+        // Limitazione dei risultati
+        let limit = parseInt(req.query.limit);
+        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+
+        // Esegui la ricerca con filtri, ordinamento e limitazione
+        const segnalazioni = await Segnalazione
+            .find(query)
+            .sort(sort)
+            .limit(limit)
+            //.select('-utente');  // Esclude il campo 'utente' dalla risposta
+
+        res.json(segnalazioni);
     } catch (error) {
-        res.status(500).json({ message: 'Errore nel recupero delle segnalazioni' });
+        res.status(500).json({ message: 'Errore durante il recupero delle segnalazioni' });
     }
 });
 
@@ -306,8 +614,8 @@ router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), a
  */
 router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), async (req, res) => {
     const { stato } = req.body;
-    const statiValidi = ['DA_VERIFICARE', 'ATTIVA', 'RISOLTA', 'SCARTATA'];
 
+    // Controllo che lo stato sia valido
     if (!statiValidi.includes(stato)) {
         return res.status(400).json({ message: 'Stato non valido' });
     }
