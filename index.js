@@ -65,7 +65,6 @@ const swaggerOptions = {
 };
 const swaggerDocument = swaggerJsDoc(swaggerOptions);
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-
 // routes
 app.use("/api/v1/auth", authRoutes); 
 app.use("/api/v1/users", userRoutes); 
