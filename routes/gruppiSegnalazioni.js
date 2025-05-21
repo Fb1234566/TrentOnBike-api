@@ -68,7 +68,7 @@ const authorizeRole = require('../middleware/authorizeRole');
  * /gruppiSegnalazioni:
  *   post:
  *     summary: Crea un nuovo gruppo di segnalazioni e associa le segnalazioni selezionate
- *     tags: [Gruppi Segnalazioni]
+ *     tags: [GruppiSegnalazioni]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -193,7 +193,7 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
  * /gruppiSegnalazioni:
  *   get:
  *     summary: Restituisce l'elenco dei gruppi di segnalazioni con possibilità di filtro, ordinamento e limitazione
- *     tags: [Gruppi Segnalazioni]
+ *     tags: [GruppiSegnalazioni]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -346,8 +346,7 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         // Ordinamento
         let sort = {};
         if (req.query.ordine) {
-            const direction = req.query.direction === 'asc' ? 1 : -1;
-            sort[req.query.ordine] = direction;
+            sort[req.query.ordine] = req.query.direction === 'asc' ? 1 : -1;
         } else {
             // Default: ultima modifica più recente
             sort['ultimaModificaIl'] = -1;
@@ -378,7 +377,7 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
  * /gruppiSegnalazioni/{id}:
  *   get:
  *     summary: Restituisce i dettagli di un gruppo di segnalazioni (senza le segnalazioni associate)
- *     tags: [Gruppi Segnalazioni]
+ *     tags: [GruppiSegnalazioni]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -424,7 +423,7 @@ router.get('/:id', authenticateToken, authorizeRole(['operatore', 'admin']), asy
  * /gruppiSegnalazioni/{id}/nome:
  *   patch:
  *     summary: Modifica il nome di un gruppo di segnalazioni
- *     tags: [Gruppi Segnalazioni]
+ *     tags: [GruppiSegnalazioni]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -503,7 +502,7 @@ router.patch('/:id/nome', authenticateToken, authorizeRole(['operatore']), async
  * /gruppiSegnalazioni/{id}:
  *   delete:
  *     summary: Elimina un gruppo di segnalazioni e scollega le segnalazioni associate
- *     tags: [Gruppi Segnalazioni]
+ *     tags: [GruppiSegnalazioni]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -547,5 +546,3 @@ router.delete('/:id', authenticateToken, authorizeRole(['operatore']), async (re
 });
 
 module.exports = router;
-
-//TODO: in GET /gruppiSegnalazioni, introdurre filtri (es.: range date), ordinamento (es.: per numero di segnalazioni decrescente) e paginazione (es.: solo primi 10 risultati)

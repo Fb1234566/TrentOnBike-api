@@ -843,7 +843,6 @@ router.patch('/:id/gruppoSegnalazioni', authenticateToken, authorizeRole(['opera
 
 module.exports = router;
 
-//TODO: aggiungere sistema di filtraggio per le segnalazioni (filtri per tipologia, per stato, per lette/non lette)
 //TODO: aggiungere endpoint che forniscono statistiche aggregate (numero segnalazioni attive...)
 // valutare quali statistiche calcolare a ogni chiamata in real time e quali tenere salvate du database (da aggiornare a ogni modifica delle segnalazioni)
 
