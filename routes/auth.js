@@ -167,7 +167,164 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// TODO: Implementare /auth/logout (può essere client-side o con blacklist di token)
-// TODO: Implementare /auth/reset-password e /auth/request-password-reset
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Effettua il logout dell'utente (principalmente client-side)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: [] 
+ *     responses:
+ *       200:
+ *         description: Logout signalato. Il client deve eliminare il token.
+ *       401:
+ *         description: Non autorizzato
+ */
+router.post('/logout', (req, res) => {
+    // Per un logout stateless con JWT, la responsabilità principale è del client
+    // che deve distruggere/eliminare il token memorizzato.
+    res.status(200).json({ message: 'Logout effettuato con successo. Il client deve eliminare il token.' });
+});
+
+
+
+/**
+ * @swagger
+ * /auth/request-password-reset:
+ *   post:
+ *     summary: Invia una richiesta per resettare la password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Se l'utente esiste, un'email di reset (simulata) è stata inviata.
+ *       404:
+ *         description: Utente non trovato con questa email.
+ *       500:
+ *         description: Errore del server.
+ */
+router.post('/request-password-reset', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: 'Email è obbligatoria.' });
+    }
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'Utente non trovato con questa email.' });
+        }
+
+        // Genera un token di reset
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex'); // Salva l'hash del token
+        user.resetPasswordExpires = Date.now() + 3600000; // Token valido per 1 ora
+
+        await user.save();
+
+        // Simula l'invio dell'email con il link di reset
+        const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
+        console.log('----------------------------------------------------------------------');
+        console.log('SIMULAZIONE INVIO EMAIL PER RESET PASSWORD');
+        console.log(`Per resettare la password per ${user.email}, visita questo link:`);
+        console.log(resetUrl);
+        console.log('Il token di reset (da includere nell\'URL sopra) è:', resetToken);
+        console.log('Questo token scadrà tra 1 ora.');
+        console.log('----------------------------------------------------------------------');
+
+        res.status(200).json({ message: 'Se l\'utente esiste, un link per il reset della password è stato inviato (controlla la console del server per la simulazione).' });
+
+    } catch (err) {
+        console.error("Errore richiesta reset password:", err);
+        res.status(500).json({ message: 'Errore durante la richiesta di reset password.', error: err.message });
+    }
+});
+
+
+/**
+ * @swagger
+ * /auth/reset-password/{token}:
+ *   post:
+ *     summary: Resetta la password usando un token di reset
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Il token di reset password ricevuto via email (simulata).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6 # Aggiungi validazioni se necessario
+ *     responses:
+ *       200:
+ *         description: Password resettata con successo.
+ *       400:
+ *         description: Token non valido, scaduto, o password mancante/non valida.
+ *       500:
+ *         description: Errore del server.
+ */
+router.post('/reset-password/:token', async (req, res) => {
+    const { password } = req.body;
+    const resetTokenFromParams = req.params.token;
+
+    if (!password) {
+        return res.status(400).json({ message: 'La nuova password è obbligatoria.' });
+    }
+    if (!resetTokenFromParams) {
+        return res.status(400).json({ message: 'Token di reset mancante.' });
+    }
+
+    try {
+        // Hasha il token ricevuto dai parametri per confrontarlo con quello nel DB
+        const hashedToken = crypto.createHash('sha256').update(resetTokenFromParams).digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() } // Controlla che il token non sia scaduto
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Token di reset password non valido o scaduto.' });
+        }
+
+        // Imposta la nuova password (l'hook pre-save la hasherà)
+        user.passwordHash = password;
+        user.resetPasswordToken = undefined; // Invalida il token
+        user.resetPasswordExpires = undefined; // Invalida la scadenza
+
+        await user.save();
+        res.status(200).json({ message: 'Password resettata con successo. Ora puoi effettuare il login con la nuova password.' });
+
+    } catch (err) {
+        console.error("Errore reset password:", err);
+        res.status(500).json({ message: 'Errore durante il reset della password.', error: err.message });
+    }
+});
+
 
 module.exports = router;

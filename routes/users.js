@@ -145,16 +145,17 @@ router.get('/me', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Errore nel recuperare l\'utente.', error: err.message });
     }
 });
-// PUT Aggiorna profilo utente corrente (nome, cognome)
+// PATCH Aggiorna profilo utente corrente (nome, cognome)
 /**
  * @swagger
  * /users/me:
- *   put:
- *     summary: Aggiorna il profilo dell'utente autenticato (nome, cognome)
+ *   patch:
+ *     summary: Aggiorna parzialmente il profilo dell'utente autenticato (es. nome, cognome)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
+ *       description: Campi da aggiornare. Invia solo i campi che vuoi modificare.
  *       required: true
  *       content:
  *         application/json:
@@ -163,34 +164,62 @@ router.get('/me', authenticateToken, async (req, res) => {
  *             properties:
  *               nome:
  *                 type: string
+ *                 example: "Mario Aggiornato"
  *               cognome:
  *                 type: string
+ *                 example: "Rossi Nuovo"
  *     responses:
  *       200:
- *         description: Profilo utente aggiornato
+ *         description: Profilo utente aggiornato con successo
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UserResponse'
  *       400:
- *         description: Dati non validi
+ *         description: Dati non validi o errore nell'aggiornamento
  *       401:
  *         description: Non autorizzato
+ *       404:
+ *         description: Utente non trovato
  */
-router.put('/me', authenticateToken, async (req, res) => {
-    const { nome, cognome } = req.body;
+router.patch('/me', authenticateToken, async (req, res) => {
+    const updates = req.body; // Oggetto con i campi da aggiornare
+    const allowedUpdates = ['nome', 'cognome']; // Definisci quali campi possono essere aggiornati
+    const actualUpdates = {};
+
+    // Filtra solo gli aggiornamenti permessi e forniti
+    for (const key in updates) {
+        if (allowedUpdates.includes(key) && updates[key] !== undefined) {
+            actualUpdates[key] = updates[key];
+        }
+    }
+
+    if (Object.keys(actualUpdates).length === 0) {
+        return res.status(400).json({ message: "Nessun dato valido fornito per l'aggiornamento." });
+    }
+
     try {
         const user = await User.findById(req.user.userId);
-        if (!user) return res.status(404).json({ message: "Utente non trovato" });
+        if (!user) {
+            return res.status(404).json({ message: "Utente non trovato" });
+        }
 
-        if (nome !== undefined) user.nome = nome;
-        if (cognome !== undefined) user.cognome = cognome;
+        // Applica gli aggiornamenti
+        Object.keys(actualUpdates).forEach(key => {
+            user[key] = actualUpdates[key];
+        });
 
-        const updatedUser = await user.save();
+        const updatedUser = await user.save(); // .save() triggera gli hook di Mongoose se presenti
         const userToReturn = updatedUser.toObject();
-        delete userToReturn.passwordHash;
+        delete userToReturn.passwordHash; // Assicurati di non esporre l'hash
+
         res.json(userToReturn);
     } catch (err) {
+        // Controlla errori di validazione Mongoose
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Errore di validazione.', errors: err.errors });
+        }
+        console.error("Errore aggiornamento profilo con PATCH:", err);
         res.status(400).json({ message: 'Errore nell\'aggiornamento del profilo.', error: err.message });
     }
 });
@@ -215,7 +244,9 @@ router.put('/me', authenticateToken, async (req, res) => {
  *       401:
  *         description: Non autorizzato
  *       404:
- *         description: Impostazioni non trovate
+ *         description: Impostazioni non trovate per questo utente
+ *       500:
+ *         description: Errore nel recuperare le impostazioni
  */
 router.get('/me/impostazioni', authenticateToken, async (req, res) => {
     try {
@@ -225,20 +256,22 @@ router.get('/me/impostazioni', authenticateToken, async (req, res) => {
         }
         res.json(impostazioni);
     } catch (err) {
+        console.error("Errore GET /users/me/impostazioni:", err);
         res.status(500).json({ message: 'Errore nel recuperare le impostazioni.', error: err.message });
     }
 });
 
-// PUT Aggiorna impostazioni utente corrente
+// PATCH Aggiorna impostazioni utente corrente
 /**
  * @swagger
  * /users/me/impostazioni:
- *   put:
- *     summary: Aggiorna le impostazioni dell'utente autenticato
+ *   patch:
+ *     summary: Aggiorna parzialmente le impostazioni dell'utente autenticato
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
+ *       description: Campi da aggiornare. Invia solo i campi che vuoi modificare.
  *       required: true
  *       content:
  *         application/json:
@@ -248,34 +281,61 @@ router.get('/me/impostazioni', authenticateToken, async (req, res) => {
  *               lingua:
  *                 type: string
  *                 enum: [it, en, de]
+ *                 example: "en"
  *               tema:
  *                 type: string
  *                 enum: [CHIARO, SCURO, SISTEMA]
+ *                 example: "SCURO"
  *               notifichePOIVicini:
  *                 type: boolean
+ *                 example: false
  *     responses:
  *       200:
- *         description: Impostazioni aggiornate
+ *         description: Impostazioni aggiornate con successo
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ImpostazioniUtente'
  *       400:
- *         description: Dati non validi
+ *         description: Dati non validi o errore nell'aggiornamento
  *       401:
  *         description: Non autorizzato
+ *       404:
+ *         description: Impostazioni utente non trovate
  */
-router.put('/me/impostazioni', authenticateToken, async (req, res) => {
-    const { lingua, tema, notifichePOIVicini } = req.body;
+router.patch('/me/impostazioni', authenticateToken, async (req, res) => {
+    const updates = req.body;
+    const allowedUpdates = ['lingua', 'tema', 'notifichePOIVicini'];
+    const updateQuery = {};
+
+    // Costruisci l'oggetto per $set solo con i campi permessi e forniti
+    for (const key in updates) {
+        if (allowedUpdates.includes(key) && updates[key] !== undefined) {
+            updateQuery[key] = updates[key];
+        }
+    }
+
+    if (Object.keys(updateQuery).length === 0) {
+        return res.status(400).json({ message: "Nessun dato valido fornito per l'aggiornamento." });
+    }
+
     try {
         const impostazioni = await ImpostazioniUtente.findOneAndUpdate(
             { utente: req.user.userId },
-            { $set: { lingua, tema, notifichePOIVicini } },
-            { new: true, runValidators: true, upsert: false } // upsert: false per non creare se non esiste
+            { $set: updateQuery }, // Usa l'oggetto updateQuery costruito
+            { new: true, runValidators: true, upsert: false }
         );
-        if (!impostazioni) return res.status(404).json({ message: "Impostazioni utente non trovate."});
+
+        if (!impostazioni) {
+            return res.status(404).json({ message: "Impostazioni utente non trovate." });
+        }
         res.json(impostazioni);
     } catch (err) {
+        // Controlla errori di validazione Mongoose (es. enum non valido)
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Errore di validazione.', errors: err.errors });
+        }
+        console.error("Errore aggiornamento impostazioni con PATCH:", err);
         res.status(400).json({ message: 'Errore nell\'aggiornamento delle impostazioni.', error: err.message });
     }
 });
