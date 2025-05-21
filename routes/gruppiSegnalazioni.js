@@ -114,6 +114,15 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
             return res.status(400).json({ message: 'Almeno una segnalazione non esiste' });
         }
 
+        // Verifica che nessuna delle segnalazioni sia già in un gruppo
+        const segnalazioniAssegnate = segnalazioniFound.filter(s => s.gruppoSegnalazioni !== null);
+        if (segnalazioniAssegnate.length > 0) {
+            return res.status(400).json({
+                message: 'Alcune segnalazioni sono già assegnate a un gruppo. Segnalazioni assegnate:',
+                segnalazioniAssegnate: segnalazioniAssegnate.map(s => s._id)
+            });
+        }
+
         // Crea un set contenente tutti gli stati delle segnalazioni fornite
         const stati = [...new Set(segnalazioniFound.map(s => s.stato))];
 
@@ -168,12 +177,13 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
 
         // Collega le segnalazioni fornite al gruppo (aggiorna il campo gruppoSegnalazioni)
         const updateFields = {
-            gruppoSegnalazioni: nuovoGruppo._id,
-            ultimaModificaIl: new Date()
+            gruppoSegnalazioni: nuovoGruppo._id
         };
         // caso in cui bisogna anche cambiare lo stato delle segnalazioni (unico possibile: da DA_VERIFICARE ad ATTIVE)
         if (cambiaStato) {
             updateFields.stato = 'ATTIVA';
+            // Solo se cambiato lo stato, aggiorno anche la data dell'ultima modifica. L'aggiunta an un gruppo non è considerata una modifica principale alla segnalazione
+            updateFields.ultimaModificaIl = new Date();
         }
         await Segnalazione.updateMany(
             { _id: { $in: segnalazioni } },
