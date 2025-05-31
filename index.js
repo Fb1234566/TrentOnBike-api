@@ -27,12 +27,18 @@ app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB Atlas
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-.then(() => console.log('Connesso a MongoDB Atlas'))
-.catch(err => console.error('Errore connessione:', err));
+const connectToMongoDB = async () => {
+    try{
+        await mongoose.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
+        console.log('Connesso a MongoDB Atlas');
+    }
+    catch (error) {
+    console.error('Errore connessione:', error);
+    }
+}
 
 // swagger-ui-express and swagger-jsdoc setup
 const swaggerOptions = {
@@ -73,7 +79,14 @@ app.use("/api/v1/percorsi", percorsoRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoutes);
 app.use('/api/v1/gruppiSegnalazioni', gruppiSegnalazioniRoutes);
 
-app.listen(port, () => {
-    console.log(`TrentOnBike API listening on http://localhost:${port}`);
-    console.log(`Swagger docs available on http://localhost:${port}/api/v1/docs`);
-});
+// Avvia il server solo se questo file viene eseguito direttamente
+if (require.main === module) {
+    connectToMongoDB().then(() => {
+        app.listen(port, () => {
+            console.log(`TrentOnBike API listening on http://localhost:${port}`);
+            console.log(`Swagger docs available on http://localhost:${port}/api/v1/docs`);
+        });
+    });
+}
+
+module.exports = {app, connectToMongoDB} // Export della app per i test
