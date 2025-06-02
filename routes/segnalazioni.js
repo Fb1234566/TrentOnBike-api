@@ -99,12 +99,13 @@ const statiValidi = ['DA_VERIFICARE', 'ATTIVA', 'RISOLTA', 'SCARTATA'];
  *         application/json:
  *           schema:
  *             type: object
- *             required: [categoria, descrizione, posizione]
+ *             required: [categoria, posizione]
  *             properties:
  *               categoria:
  *                 type: string
  *               descrizione:
  *                 type: string
+ *                 nullable: true
  *               posizione:
  *                 $ref: '#/components/schemas/Posizione'
  *     responses:
@@ -123,7 +124,7 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
     try {
         const { categoria, descrizione, posizione } = req.body;
 
-        if (!categoria || !descrizione || !posizione?.coordinates) {
+        if (!categoria || !posizione?.coordinates) {
             return res.status(400).json({ message: 'Dati mancanti o incompleti.' });
         }
 
@@ -138,7 +139,7 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
         const nuovaSegnalazione = new Segnalazione({
             utente: req.user.userId,
             categoria,
-            descrizione,
+            descrizione,   //facoltativa
             posizione: {
                 ...posizione,
                 via: null //via: via (quando implementato)
@@ -278,8 +279,13 @@ router.get('/mie', authenticateToken, authorizeRole(['utente']), async (req, res
         }
 
         // Limitazione dei risultati
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
+        }
 
         // Esegui la ricerca con filtri e ordinamento, limitando il numero di risultati
         const segnalazioni = await Segnalazione
@@ -491,8 +497,13 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         }
 
         // Limitazione dei risultati
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
+        }
 
         // Esegui la ricerca con filtri, ordinamento e limitazione
         const segnalazioni = await Segnalazione
@@ -504,6 +515,56 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         res.json(segnalazioni);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante il recupero delle segnalazioni' });
+    }
+});
+
+//GET ottiene una segnalazione specifica
+/**
+ * @swagger
+ * /segnalazioni/{id}:
+ *   get:
+ *     summary: Ottieni i dettagli di una specifica segnalazione
+ *     tags: [Segnalazioni]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID della segnalazione
+ *     responses:
+ *       200:
+ *         description: Dettagli della segnalazione recuperati con successo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Segnalazione'
+ *       404:
+ *         description: Segnalazione non trovata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Errore interno del server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id', authenticateToken, authorizeRole(['operatore', 'admin']), async (req, res) => {
+    try {
+        const segnalazione = await Segnalazione.findById(req.params.id);
+
+        if (!segnalazione) {
+            return res.status(404).json({ message: 'Segnalazione non trovata.' });
+        }
+
+        res.status(200).json(segnalazione);
+    } catch (error) {
+        res.status(500).json({ message: 'Errore interno del server', error: error.message });
     }
 });
 

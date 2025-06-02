@@ -312,7 +312,6 @@ components:
         - utente
         - posizione
         - categoria
-        - descrizione
       properties:
         _id:
           type: string
@@ -327,6 +326,8 @@ components:
           enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
         descrizione:
           type: string
+          nullable: true
+          default: null
         stato:
           type: string
           enum: [DA_VERIFICARE, ATTIVA, RISOLTA, SCARTATA]
@@ -352,13 +353,14 @@ components:
           default: null
     SegnalazioneInput:
       type: object
-      required: [categoria, descrizione, posizione]
+      required: [categoria, posizione]
       properties:
         categoria:
           type: string
           enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
         descrizione:
           type: string
+          nullable: true
         posizione:
           $ref: '#/components/schemas/PosizioneGeoJSON'
     SegnalazioneUtenteView:
@@ -1058,6 +1060,40 @@ paths:
           description: Parametro non valido.
         '500':
           description: Errore interno del server.
+  /segnalazioni/{id}:
+    get:
+      summary: Ottieni i dettagli di una specifica segnalazione
+      description: Recupera i dettagli completi di una specifica segnalazione usando il suo ID
+      tags:
+        - Segnalazioni
+      security:
+        - bearerAuth: [ ] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione da recuperare
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dettagli recuperati con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Segnalazione'
+        '404':
+          description: La segnalazione non è stata trovata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Errore interno del server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /segnalazioni/{id}/commento:
     patch:
       tags: [Segnalazioni]
