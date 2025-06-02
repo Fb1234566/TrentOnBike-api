@@ -363,9 +363,12 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         }
 
         // Limitazione
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) {
-            return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
         }
 
         // Query finale
