@@ -12,10 +12,14 @@ const percorsoRoutes = require('./routes/percorsi');
 const segnalazioniRoutes = require('./routes/segnalazioni');
 const gruppiSegnalazioniRoutes = require('./routes/gruppiSegnalazioni');
 const statisticheVieRoutes = require('./routes/statisticheVie');
+const globalTimestampsRoutes = require('./routes/globalTimestamps');
 
 // mongoose
 const mongoose = require('mongoose');
 require('dotenv').config();
+
+// timestamps globali// timestamps globali
+const { initGlobalTimestamp } = require('./models/GlobalTimestamp');
 
 // express setup
 const app = express();
@@ -92,6 +96,7 @@ app.use("/api/v1/percorsi", percorsoRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoutes);
 app.use('/api/v1/gruppiSegnalazioni', gruppiSegnalazioniRoutes);
 app.use('/api/v1/statisticheVie', statisticheVieRoutes); // NUOVA ROUTE AGGIUNTA
+app.use('/api/v1/globalTimestamps', globalTimestampsRoutes);
 
 // Gestione errori centralizzata (opzionale ma consigliata per produzione)
 app.use((err, req, res, next) => {
@@ -102,7 +107,11 @@ app.use((err, req, res, next) => {
 
 // Avvia il server solo se questo file viene eseguito direttamente
 if (require.main === module) {
-    connectToMongoDB().then(() => {
+    connectToMongoDB().then(async () => {
+        // Inizializza i timestamp globali
+        await initGlobalTimestamp();
+
+        // Avvia il server
         app.listen(port, () => {
             console.log(`TrentOnBike API listening on http://localhost:${port}`);
             console.log(`Swagger docs available on http://localhost:${port}/api/v1/docs`);

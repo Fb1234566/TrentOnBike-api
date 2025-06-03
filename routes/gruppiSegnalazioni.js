@@ -4,6 +4,7 @@ const GruppoSegnalazioni = require('../models/GruppoSegnalazioni');
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/globalTimestamp');
 
 /**
  * @swagger
@@ -102,7 +103,7 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
     const { nome, segnalazioni } = req.body;
 
     if (!segnalazioni || segnalazioni.length === 0) {
-        return res.status(400).json({ message: 'Devono essere forniti almeno una segnalazione' });
+        return res.status(400).json({ message: 'Deve essere fornita almeno una segnalazione' });
     }
 
     try {
@@ -189,6 +190,9 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
             { _id: { $in: segnalazioni } },
             { $set: updateFields }
         );
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
 
         res.status(201).json({ message: 'Gruppo di segnalazioni creato con successo', gruppo: nuovoGruppo });
     } catch (error) {
@@ -502,6 +506,9 @@ router.patch('/:id/nome', authenticateToken, authorizeRole(['operatore']), async
 
         await gruppo.save();
 
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
         res.status(200).json({ message: 'Nome del gruppo modificato con successo', gruppo });
     } catch (error) {
         console.error('Errore durante la modifica del nome del gruppo di segnalazioni:', error);
@@ -551,6 +558,9 @@ router.delete('/:id', authenticateToken, authorizeRole(['operatore']), async (re
 
         // Elimina il gruppo
         await GruppoSegnalazioni.findByIdAndDelete(gruppoId);
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
 
         res.status(200).json({ message: 'Gruppo eliminato e segnalazioni scollegate correttamente' });
     } catch (error) {

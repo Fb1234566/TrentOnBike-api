@@ -3,6 +3,7 @@ const router = express.Router();
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/globalTimestamp');
 
 /* I permessi dei vari endpoint seguono i principi di separazione dei ruoli e minimo privilegio:
 - utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato (non tutti i loro campi però)
@@ -147,6 +148,10 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
         });
 
         await nuovaSegnalazione.save();
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
         res.status(201).json(nuovaSegnalazione);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante la creazione della segnalazione', error: error.message });
@@ -630,6 +635,9 @@ router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), a
             return res.status(404).json({ message: 'Segnalazione non trovata' });
         }
 
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
         res.status(200).json(aggiornata);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante l\'aggiornamento del commento', error: error.message });
@@ -708,6 +716,9 @@ router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), asyn
             segnalazione.ultimaModificaIl = new Date();
             await segnalazione.save();
 
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
             return res.status(200).json({
                 message: `Stato aggiornato a '${stato}' per la segnalazione`,
                 segnalazione
@@ -757,7 +768,11 @@ router.patch('/:id/lettura', authenticateToken, authorizeRole(['operatore']), as
         segnalazione.lettaDalComune = true;
 
         await segnalazione.save();
-        res.json({ message: 'Segnalazione marcata come letta', segnalazione });
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
+        res.status(200).json({ message: 'Segnalazione marcata come letta', segnalazione });
     } catch (err) {
         res.status(500).json({ message: 'Errore nel marcare come letta', error: err.message });
     }
@@ -835,6 +850,10 @@ router.patch('/:id/gruppoSegnalazioni', authenticateToken, authorizeRole(['opera
                 // Se il gruppo rimane, aggiorna la data
                 gruppo.ultimaModificaIl = new Date();
                 await gruppo.save();
+
+                // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+                await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
                 return res.status(200).json({ message: 'Segnalazione rimossa dal gruppo con successo' });
             }
         }
@@ -893,8 +912,12 @@ router.patch('/:id/gruppoSegnalazioni', authenticateToken, authorizeRole(['opera
         await gruppo.save();
 
         if (gruppoEliminato) {
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
             return res.status(200).json({ message: 'Segnalazione aggiunta al gruppo con successo. Gruppo precedente eliminato perché vuoto.' });
         }
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
         return res.status(200).json({ message: 'Segnalazione aggiunta al gruppo con successo' });
     } catch (error) {
         console.error('Errore durante l\'aggiornamento del gruppo della segnalazione:', error);
