@@ -14,7 +14,7 @@ const ImpostazioniUtenteSchema = new mongoose.Schema({
     },
     tema: {
         type: String,
-        enum: ['CHIARO', 'SCURO'],
+        enum: ['CHIARO', 'SCURO', 'SISTEMA'],
         default: 'CHIARO'
     },
     notifichePOIVicini: {

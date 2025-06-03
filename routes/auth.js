@@ -82,17 +82,23 @@ router.post('/register', async (req, res) => {
 
         savedUser.statistiche = savedStatistiche._id;
         savedUser.impostazioni = savedImpostazioni._id;
-        await savedUser.save();
+        await savedUser.save(); // Salva gli ID nell'utente
 
         // Genera token JWT
-        const payload = { userId: savedUser._id, ruolo: savedUser.ruolo};   //modificato: genera token anche a partire dal ruolo dell'utente
+        const payload = { userId: savedUser._id, ruolo: savedUser.ruolo };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        // Rimuovi passwordHash dalla risposta
-        const userToReturn = savedUser.toObject();
-        delete userToReturn.passwordHash;
+        // Popola l'utente prima di inviarlo
+        const populatedUser = await User.findById(savedUser._id)
+            .populate('impostazioni')
+            .populate('statistiche')
+            .select('-passwordHash'); 
 
-        res.status(201).json({ user: userToReturn, token, message: 'Utente registrato con successo' });
+        res.status(201).json({ 
+            user: populatedUser,
+            token, 
+            message: 'Utente registrato con successo' 
+        });
 
     } catch (err) {
         console.error("Errore registrazione:", err);
