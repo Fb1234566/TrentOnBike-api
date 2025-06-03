@@ -748,11 +748,17 @@ router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), asyn
  *           type: string
  *     responses:
  *       200:
- *         description: Segnalazione marcata come letta
+ *         description: Operazione completata con successo
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Segnalazione'
+ *                 type: object
+ *                 properties:
+ *                   message:
+ *                     type: string
+ *                     example: "Segnalazione marcata come letta" # oppure: "La segnalazione era già marcata come letta"
+ *                   segnalazione:
+ *                     $ref: '#/components/schemas/Segnalazione'
  *       404:
  *         description: Segnalazione non trovata
  *       500:
@@ -765,14 +771,16 @@ router.patch('/:id/lettura', authenticateToken, authorizeRole(['operatore']), as
             return res.status(404).json({message: 'Segnalazione non trovata'});
         }
 
-        segnalazione.lettaDalComune = true;
+        if(!segnalazione.lettaDalComune){
+            segnalazione.lettaDalComune = true;
+            await segnalazione.save();
 
-        await segnalazione.save();
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+            return res.status(200).json({ message: 'Segnalazione marcata come letta', segnalazione });
+        }
 
-        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
-        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
-
-        res.status(200).json({ message: 'Segnalazione marcata come letta', segnalazione });
+        res.status(200).json({ message: 'La segnalazione era già marcata come letta', segnalazione });
     } catch (err) {
         res.status(500).json({ message: 'Errore nel marcare come letta', error: err.message });
     }

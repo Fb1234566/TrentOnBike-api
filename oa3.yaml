@@ -1194,13 +1194,15 @@ paths:
           schema: { type: string, format: objectId }
       responses:
         '200':
-          description: Segnalazione marcata come letta.
+          description: Operazione completata con successo
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message: { type: string }
+                  message:
+                    type: string
+                    example: "Segnalazione marcata come letta" # oppure: "La segnalazione era già marcata come letta"
                   segnalazione: { $ref: '#/components/schemas/Segnalazione' }
         '404':
           description: Segnalazione non trovata.
