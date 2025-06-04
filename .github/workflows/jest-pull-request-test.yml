@@ -25,5 +25,5 @@ jobs:
       - name: Esegui test Jest
         run: npm test
         env:
-          MONGO_URI: ${{ vars.MONGO_URI }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
