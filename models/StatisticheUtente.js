@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 
+const ViaPercorsaSchema = new mongoose.Schema({
+    nomeVia: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+    },
+    timestampIngresso: { // Momento in cui l'utente è entrato nella via durante la sessione
+        type: Date,
+        required: true
+    }
+    // Si potrebbe aggiungere timestampUscita, durataPermanenza, ecc.
+}, { _id: false });
+
+
 const SessioneCiclismoSchema = new mongoose.Schema({
     dataOraInizio: {
         type: Date,
@@ -13,9 +28,9 @@ const SessioneCiclismoSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    percorsoEffettuato: { 
+    percorsoEffettuato: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Percorso' // Bisogna creare un modello Percorso (Filippo)
+        ref: 'Percorso'
     },
     velocitaMedia: { // km/h
         type: Number,
@@ -25,9 +40,13 @@ const SessioneCiclismoSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    co2Risparmiato: { 
+    co2Risparmiato: {
         type: Number,
         default: 0
+    },
+    viePercorse: { // NUOVO CAMPO OPZIONALE
+        type: [ViaPercorsaSchema],
+        default: undefined // Per non salvarlo se non fornito
     }
 });
 
@@ -36,7 +55,7 @@ const StatisticheUtenteSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        unique: true // Ogni utente ha un solo set di statistiche
+        unique: true
     },
     kmTotali: {
         type: Number,
@@ -50,33 +69,23 @@ const StatisticheUtenteSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    sessioni: [SessioneCiclismoSchema], // Array di sotto-documenti
-    velocitaMediaGenerale: { // Calcolata su tutte le sessioni
+    sessioni: [SessioneCiclismoSchema],
+    velocitaMediaGenerale: {
         type: Number,
         default: 0
     }
 }, { timestamps: true });
 
-// Metodo per aggiornare le statistiche totali quando si aggiunge una sessione
 StatisticheUtenteSchema.methods.aggiornaStatisticheGenerali = function() {
-    //se non è presente il dato, di default è 0
-    // Calcola il totale dei chilometri
     this.kmTotali = this.sessioni.reduce((acc, curr) => acc + (curr.distanzaKm || 0), 0);
-
-    // Calcola il totale delle calorie bruciate
     this.calorieTotali = this.sessioni.reduce((acc, curr) => acc + (curr.calorieBruciate || 0), 0);
-
-    // Calcola il totale della CO2 risparmiata
     this.co2RisparmiatoTotale = this.sessioni.reduce((acc, curr) => acc + (curr.co2Risparmiato || 0), 0);
 
-    // Filtra le sessioni che hanno una velocità media valida (maggiore di 0)
-    const sessioniConVelocita = this.sessioni.filter(s => s.velocitaMedia > 0);
+    const sessioniConVelocita = this.sessioni.filter(s => s.velocitaMedia && s.velocitaMedia > 0);
 
     if (sessioniConVelocita.length > 0) {
-        // Calcola la velocità media generale come media aritmetica delle velocità medie
         this.velocitaMediaGenerale = sessioniConVelocita.reduce((acc, curr) => acc + curr.velocitaMedia, 0) / sessioniConVelocita.length;
     } else {
-        // Se non ci sono sessioni valide, imposta la velocità media generale a 0
         this.velocitaMediaGenerale = 0;
     }
 };

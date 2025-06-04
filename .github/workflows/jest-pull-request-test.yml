@@ -7,6 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: Test
 
     steps:
       - name: Checkout del codice
@@ -23,3 +24,6 @@ jobs:
 
       - name: Esegui test Jest
         run: npm test
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
