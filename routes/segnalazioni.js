@@ -617,8 +617,8 @@ router.get('/:id', authenticateToken, authorizeRole(['operatore', 'admin']), asy
 router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), async (req, res) => {
     const { commento } = req.body;
 
-    if (!commento || typeof commento !== 'string') {
-        return res.status(400).json({ message: 'Il campo commento è obbligatorio e deve essere una stringa.' });
+    if (typeof commento !== 'string') {
+        return res.status(400).json({ message: 'Il campo commento deve essere una stringa.' });
     }
 
     try {
