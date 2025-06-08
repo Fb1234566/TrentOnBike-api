@@ -498,7 +498,7 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
             sort[req.query.ordine] = req.query.direction === 'asc' ? 1 : -1;
         } else {
             // Se non è stato fornito un parametro di ordinamento, usa 'creatoIl' con direzione decrescente
-            sort['creatoIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
+            sort['creataIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
         }
 
         // Limitazione dei risultati
