@@ -15,9 +15,11 @@ let standardUserToken;
 
 beforeAll(async () => {
     await connectToMongoDB();
-    await User.deleteMany({});
-    await ImpostazioniUtente.deleteMany({});
-    await StatisticheUtente.deleteMany({});
+
+    // Pulisci solo gli utenti di test (e relative impostazioni/statistiche)
+    await User.deleteMany({ _id: { $in: [adminId, standardUserId] } });
+    await ImpostazioniUtente.deleteMany({ utente: { $in: [adminId, standardUserId] } });
+    await StatisticheUtente.deleteMany({ utente: { $in: [adminId, standardUserId] } });
 
     const admin = await new User({
         _id: adminId,
@@ -42,6 +44,12 @@ beforeAll(async () => {
     standardUserToken = jwt.sign({ userId: standardUser._id, ruolo: 'utente' }, jwtSecret, { expiresIn: '1h' });
 });
 
+afterAll(async () => {
+    // Elimina solo gli utenti di test e dati collegati
+    await User.deleteMany({ _id: { $in: [adminId, standardUserId] } });
+    await ImpostazioniUtente.deleteMany({ utente: { $in: [adminId, standardUserId] } });
+    await StatisticheUtente.deleteMany({ utente: { $in: [adminId, standardUserId] } });
+});
 
 describe('GET /users/me', () => {
     test('Dovrebbe restituire 401 se non autenticato', async () => {
