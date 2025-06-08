@@ -27,3 +27,5 @@ jobs:
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
+          TEST_USER_ROLE: ${{ secrets.TEST_USER_ROLE }}
