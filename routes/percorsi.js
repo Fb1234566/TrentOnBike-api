@@ -153,8 +153,14 @@ router.post('/', authenticateToken, authorizeRole(['operatore', 'admin']), async
 router.get('/:id', authenticateToken, async (req, res) => {
     try{
         const percorso = await Percorso.findById(req.params.id)
-            .populate('created_by')
-            .populate("tappe")
+            .populate('createdBy')
+            .populate({
+                path: 'tappe',
+                populate: {
+                    path: 'puntoDiInteresse'
+                }
+            });
+
 /*            .populate({
             path: 'tappe'
         })*/

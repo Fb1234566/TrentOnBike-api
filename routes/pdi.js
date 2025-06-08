@@ -44,37 +44,61 @@ PDIs Routes
 
 /**
  * @swagger
- * /pdi/:
+ * /pdi:
  *   get:
  *     tags: [Punti di Interesse]
- *     summary: Get all the pdi
+ *     summary: Ottieni tutti i punti di interesse con filtro opzionale per tipo
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tipoPoi
+ *         schema:
+ *           type: string
+ *         description: Filtra i punti di interesse per tipologia. Usa i valori separati da virgola per filtrare per più tipi (es. MUSEO,MONUMENTO)
+ *         required: false
  *     responses:
  *       200:
- *         description: Lista dei punti di interesse
+ *         description: Lista dei punti di interesse filtrati
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   _id:
- *                     type: string
- *                   nome:
- *                     type: string
- *                   descrizione:
- *                     type: string
- *                   posizione:
- *                     type: array
- *                     items:
- *                       type: number
- *                   tipoPoi:
- *                     type: string
+ *                 $ref: '#/components/schemas/PDI'
+ *             example:
+ *               - _id: "60d21b4667d0d8992e610c85"
+ *                 nome: "Museo del Ciclismo"
+ *                 descrizione: "Museo dedicato alla storia del ciclismo"
+ *                 posizione: [45.464211, 9.191383]
+ *                 tipoPoi: "MUSEO"
+ *       400:
+ *         description: Errore nella richiesta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: Errore nella richiesta
  */
 
 router.get('/', authenticateToken, async (req, res) => {
-    const pdis = await PDI.find();
-    return res.status(200).json(pdis);
+    try {
+        const { tipoPoi } = req.query;
+        let query = {};
+
+        if (tipoPoi) {
+            // Dividi la stringa in un array di tipi
+            const tipiArray = tipoPoi.split(',');
+            query = { tipoPoi: { $in: tipiArray } };
+        }
+
+        const pdis = await PDI.find(query);
+        return res.status(200).json(pdis);
+    } catch (err) {
+        return res.status(400).json({ error: err.message });
+    }
 });
 
 /**
