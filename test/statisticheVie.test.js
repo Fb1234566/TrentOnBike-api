@@ -26,10 +26,6 @@ beforeAll(async () => {
     ]);
 });
 
-afterAll(async () => {
-    await RegistroAccessoVia.deleteMany({});
-});
-
 describe('POST /statisticheVie/registraPassaggio', () => {
     test('Dovrebbe restituire 401 se non autenticato', async () => {
         const response = await request(app)

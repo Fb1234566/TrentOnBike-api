@@ -42,11 +42,6 @@ beforeAll(async () => {
     standardUserToken = jwt.sign({ userId: standardUser._id, ruolo: 'utente' }, jwtSecret, { expiresIn: '1h' });
 });
 
-afterAll(async () => {
-    await User.deleteMany({});
-    await ImpostazioniUtente.deleteMany({});
-    await StatisticheUtente.deleteMany({});
-});
 
 describe('GET /users/me', () => {
     test('Dovrebbe restituire 401 se non autenticato', async () => {
