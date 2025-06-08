@@ -55,8 +55,7 @@ PDIs Routes
  *         name: tipoPoi
  *         schema:
  *           type: string
- *           enum: [RASTRELLIERA, OFFICINA, FONTANELLA, PUNTO_RICARICA, MUSEO, MONUMENTO, LUOGO_STORICO_CULTURALE, ALTRO]
- *         description: Filtra i punti di interesse per tipologia
+ *         description: Filtra i punti di interesse per tipologia. Usa i valori separati da virgola per filtrare per più tipi (es. MUSEO,MONUMENTO)
  *         required: false
  *     responses:
  *       200:
@@ -87,7 +86,13 @@ PDIs Routes
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const { tipoPoi } = req.query;
-        const query = tipoPoi ? { tipoPoi } : {};
+        let query = {};
+
+        if (tipoPoi) {
+            // Dividi la stringa in un array di tipi
+            const tipiArray = tipoPoi.split(',');
+            query = { tipoPoi: { $in: tipiArray } };
+        }
 
         const pdis = await PDI.find(query);
         return res.status(200).json(pdis);
