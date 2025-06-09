@@ -1,0 +1,26 @@
+# .github/workflows/deploy.yml
+name: Deploy to Render
+
+on:
+  workflow_run:
+    workflows: ["Test Jest Automatici"]  # Nome del tuo workflow di test
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Wait for Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render Deployment
+        uses: bounceapp/render-action@0.6.0
+        # https://github.com/marketplace/actions/render-github-action
+        with:
+          render-token: ${{ secrets.RENDER_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          service-id: ${{ secrets.RENDER_ID }}
+          # srv-xxxxxxxxxxxxxxxxxxxx
+          retries: 20
+          wait: 16000
+          sleep: 30000
