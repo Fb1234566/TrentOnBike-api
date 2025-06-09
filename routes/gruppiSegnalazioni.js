@@ -4,7 +4,7 @@ const GruppoSegnalazioni = require('../models/GruppoSegnalazioni');
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
-const { VALID_KEYS, updateGlobalTimestamp } = require('../models/globalTimestamp');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/GlobalTimestamp');
 
 /**
  * @swagger
