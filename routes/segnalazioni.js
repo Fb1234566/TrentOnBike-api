@@ -3,6 +3,7 @@ const router = express.Router();
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/GlobalTimestamp');
 
 /* I permessi dei vari endpoint seguono i principi di separazione dei ruoli e minimo privilegio:
 - utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato (non tutti i loro campi però)
@@ -99,12 +100,13 @@ const statiValidi = ['DA_VERIFICARE', 'ATTIVA', 'RISOLTA', 'SCARTATA'];
  *         application/json:
  *           schema:
  *             type: object
- *             required: [categoria, descrizione, posizione]
+ *             required: [categoria, posizione]
  *             properties:
  *               categoria:
  *                 type: string
  *               descrizione:
  *                 type: string
+ *                 nullable: true
  *               posizione:
  *                 $ref: '#/components/schemas/Posizione'
  *     responses:
@@ -123,7 +125,7 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
     try {
         const { categoria, descrizione, posizione } = req.body;
 
-        if (!categoria || !descrizione || !posizione?.coordinates) {
+        if (!categoria || !posizione?.coordinates) {
             return res.status(400).json({ message: 'Dati mancanti o incompleti.' });
         }
 
@@ -138,7 +140,7 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
         const nuovaSegnalazione = new Segnalazione({
             utente: req.user.userId,
             categoria,
-            descrizione,
+            descrizione,   //facoltativa
             posizione: {
                 ...posizione,
                 via: null //via: via (quando implementato)
@@ -146,6 +148,10 @@ router.post('/', authenticateToken, authorizeRole(['utente']), async (req, res) 
         });
 
         await nuovaSegnalazione.save();
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
         res.status(201).json(nuovaSegnalazione);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante la creazione della segnalazione', error: error.message });
@@ -278,8 +284,13 @@ router.get('/mie', authenticateToken, authorizeRole(['utente']), async (req, res
         }
 
         // Limitazione dei risultati
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
+        }
 
         // Esegui la ricerca con filtri e ordinamento, limitando il numero di risultati
         const segnalazioni = await Segnalazione
@@ -438,9 +449,9 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
             const dataInizio = req.query.daData ? new Date(req.query.daData) : null;
             const dataFine = req.query.aData ? new Date(req.query.aData) : null;
             if (dataInizio || dataFine) {
-                query.creatoIl = {};
-                if (dataInizio) query.creatoIl.$gte = dataInizio;
-                if (dataFine) query.creatoIl.$lte = dataFine;
+                query.creataIl = {};
+                if (dataInizio) query.creataIl.$gte = dataInizio;
+                if (dataFine) query.creataIl.$lte = dataFine;
             }
         }
 
@@ -487,12 +498,17 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
             sort[req.query.ordine] = req.query.direction === 'asc' ? 1 : -1;
         } else {
             // Se non è stato fornito un parametro di ordinamento, usa 'creatoIl' con direzione decrescente
-            sort['creatoIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
+            sort['creataIl'] = -1; // 1 per crescente, -1 per decrescente (predefinito)
         }
 
         // Limitazione dei risultati
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
+        }
 
         // Esegui la ricerca con filtri, ordinamento e limitazione
         const segnalazioni = await Segnalazione
@@ -504,6 +520,56 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         res.json(segnalazioni);
     } catch (error) {
         res.status(500).json({ message: 'Errore durante il recupero delle segnalazioni' });
+    }
+});
+
+//GET ottiene una segnalazione specifica
+/**
+ * @swagger
+ * /segnalazioni/{id}:
+ *   get:
+ *     summary: Ottieni i dettagli di una specifica segnalazione
+ *     tags: [Segnalazioni]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID della segnalazione
+ *     responses:
+ *       200:
+ *         description: Dettagli della segnalazione recuperati con successo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Segnalazione'
+ *       404:
+ *         description: Segnalazione non trovata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Errore interno del server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id', authenticateToken, authorizeRole(['operatore', 'admin']), async (req, res) => {
+    try {
+        const segnalazione = await Segnalazione.findById(req.params.id);
+
+        if (!segnalazione) {
+            return res.status(404).json({ message: 'Segnalazione non trovata.' });
+        }
+
+        res.status(200).json(segnalazione);
+    } catch (error) {
+        res.status(500).json({ message: 'Errore interno del server', error: error.message });
     }
 });
 
@@ -551,8 +617,8 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
 router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), async (req, res) => {
     const { commento } = req.body;
 
-    if (!commento || typeof commento !== 'string') {
-        return res.status(400).json({ message: 'Il campo commento è obbligatorio e deve essere una stringa.' });
+    if (typeof commento !== 'string') {
+        return res.status(400).json({ message: 'Il campo commento deve essere una stringa.' });
     }
 
     try {
@@ -560,7 +626,7 @@ router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), a
             req.params.id,
             {
                 commento,
-                ultimaModificataIl: Date.now()
+                ultimaModificaIl: Date.now()
             },
             { new: true }
         );
@@ -568,6 +634,9 @@ router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), a
         if (!aggiornata) {
             return res.status(404).json({ message: 'Segnalazione non trovata' });
         }
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
 
         res.status(200).json(aggiornata);
     } catch (error) {
@@ -647,6 +716,9 @@ router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), asyn
             segnalazione.ultimaModificaIl = new Date();
             await segnalazione.save();
 
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
             return res.status(200).json({
                 message: `Stato aggiornato a '${stato}' per la segnalazione`,
                 segnalazione
@@ -676,11 +748,17 @@ router.patch('/:id/stato', authenticateToken, authorizeRole(['operatore']), asyn
  *           type: string
  *     responses:
  *       200:
- *         description: Segnalazione marcata come letta
+ *         description: Operazione completata con successo
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Segnalazione'
+ *                 type: object
+ *                 properties:
+ *                   message:
+ *                     type: string
+ *                     example: "Segnalazione marcata come letta" # oppure: "La segnalazione era già marcata come letta"
+ *                   segnalazione:
+ *                     $ref: '#/components/schemas/Segnalazione'
  *       404:
  *         description: Segnalazione non trovata
  *       500:
@@ -693,10 +771,16 @@ router.patch('/:id/lettura', authenticateToken, authorizeRole(['operatore']), as
             return res.status(404).json({message: 'Segnalazione non trovata'});
         }
 
-        segnalazione.lettaDalComune = true;
+        if(!segnalazione.lettaDalComune){
+            segnalazione.lettaDalComune = true;
+            await segnalazione.save();
 
-        await segnalazione.save();
-        res.json({ message: 'Segnalazione marcata come letta', segnalazione });
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+            return res.status(200).json({ message: 'Segnalazione marcata come letta', segnalazione });
+        }
+
+        res.status(200).json({ message: 'La segnalazione era già marcata come letta', segnalazione });
     } catch (err) {
         res.status(500).json({ message: 'Errore nel marcare come letta', error: err.message });
     }
@@ -774,6 +858,10 @@ router.patch('/:id/gruppoSegnalazioni', authenticateToken, authorizeRole(['opera
                 // Se il gruppo rimane, aggiorna la data
                 gruppo.ultimaModificaIl = new Date();
                 await gruppo.save();
+
+                // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+                await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
                 return res.status(200).json({ message: 'Segnalazione rimossa dal gruppo con successo' });
             }
         }
@@ -832,8 +920,12 @@ router.patch('/:id/gruppoSegnalazioni', authenticateToken, authorizeRole(['opera
         await gruppo.save();
 
         if (gruppoEliminato) {
+            // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+            await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
             return res.status(200).json({ message: 'Segnalazione aggiunta al gruppo con successo. Gruppo precedente eliminato perché vuoto.' });
         }
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
         return res.status(200).json({ message: 'Segnalazione aggiunta al gruppo con successo' });
     } catch (error) {
         console.error('Errore durante l\'aggiornamento del gruppo della segnalazione:', error);

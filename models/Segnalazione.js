@@ -24,7 +24,8 @@ const SegnalazioneSchema = new mongoose.Schema({
     },
     descrizione: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     stato: {
         type: String,
@@ -44,7 +45,8 @@ const SegnalazioneSchema = new mongoose.Schema({
         default: false
     },
     commento: {
-        type: String // testo libero inserito dall'operatore
+        type: String, // testo libero inserito dall'operatore
+        default: null
     },
     gruppoSegnalazioni: {
         type: mongoose.Schema.Types.ObjectId,

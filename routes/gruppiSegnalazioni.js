@@ -4,6 +4,7 @@ const GruppoSegnalazioni = require('../models/GruppoSegnalazioni');
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/GlobalTimestamp');
 
 /**
  * @swagger
@@ -102,7 +103,7 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
     const { nome, segnalazioni } = req.body;
 
     if (!segnalazioni || segnalazioni.length === 0) {
-        return res.status(400).json({ message: 'Devono essere forniti almeno una segnalazione' });
+        return res.status(400).json({ message: 'Deve essere fornita almeno una segnalazione' });
     }
 
     try {
@@ -189,6 +190,9 @@ router.post('/', authenticateToken, authorizeRole(['operatore']), async (req, re
             { _id: { $in: segnalazioni } },
             { $set: updateFields }
         );
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
 
         res.status(201).json({ message: 'Gruppo di segnalazioni creato con successo', gruppo: nuovoGruppo });
     } catch (error) {
@@ -363,9 +367,12 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
         }
 
         // Limitazione
-        let limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit < 1) {
-            return res.status(400).json({ message: 'Parametro limit non valido' });
+        let limit;
+        if (req.query.limit !== undefined) { // Controlla solo se il parametro esiste
+            limit = parseInt(req.query.limit, 10); // Converte il parametro in un numero intero
+            if (isNaN(limit) || limit < 1) { // Se non è un numero o è negativo/zero, restituisci errore
+                return res.status(400).json({ message: 'Parametro limit non valido' });
+            }
         }
 
         // Query finale
@@ -499,6 +506,9 @@ router.patch('/:id/nome', authenticateToken, authorizeRole(['operatore']), async
 
         await gruppo.save();
 
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
+
         res.status(200).json({ message: 'Nome del gruppo modificato con successo', gruppo });
     } catch (error) {
         console.error('Errore durante la modifica del nome del gruppo di segnalazioni:', error);
@@ -548,6 +558,9 @@ router.delete('/:id', authenticateToken, authorizeRole(['operatore']), async (re
 
         // Elimina il gruppo
         await GruppoSegnalazioni.findByIdAndDelete(gruppoId);
+
+        // Aggiorna il timestamp globale dell'ultima modifica alle segnalazioni
+        await updateGlobalTimestamp(VALID_KEYS.LAST_REPORTS_UPDATE);
 
         res.status(200).json({ message: 'Gruppo eliminato e segnalazioni scollegate correttamente' });
     } catch (error) {

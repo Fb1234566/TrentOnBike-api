@@ -19,6 +19,8 @@ tags:
     description: Gestione dei Punti Di Interesse (PDI)
   - name: Percorsi
     description: Gestione dei Percorsi e delle Tappe
+  - name: Global Timestamps
+    description: Endpoint per la gestione dei timestamp globali, come "lastReportsUpdate".
 components:
   schemas:
     ErrorResponse:
@@ -312,7 +314,6 @@ components:
         - utente
         - posizione
         - categoria
-        - descrizione
       properties:
         _id:
           type: string
@@ -327,6 +328,8 @@ components:
           enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
         descrizione:
           type: string
+          nullable: true
+          default: null
         stato:
           type: string
           enum: [DA_VERIFICARE, ATTIVA, RISOLTA, SCARTATA]
@@ -352,13 +355,14 @@ components:
           default: null
     SegnalazioneInput:
       type: object
-      required: [categoria, descrizione, posizione]
+      required: [categoria, posizione]
       properties:
         categoria:
           type: string
           enum: [OSTACOLO, ILLUMINAZIONE_INSUFFICIENTE, PISTA_DANNEGGIATA, SEGNALAZIONE_STRADALE_MANCANTE, ALTRO]
         descrizione:
           type: string
+          nullable: true
         posizione:
           $ref: '#/components/schemas/PosizioneGeoJSON'
     SegnalazioneUtenteView:
@@ -623,6 +627,21 @@ components:
         puntoDiInteresse:
           type: string
           format: objectId
+
+    #GlobalTimestamps schema
+    GlobalTimestamp:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [ lastReportsUpdate ]
+          example: lastReportsUpdate
+          description: Nome del timestamp globale
+        value:
+          type: string
+          format: date-time
+          description: Valore del timestamp globale
+          example: "2023-10-31T15:24:00.000Z"
 
   securitySchemes:
     BearerAuth:
@@ -1058,6 +1077,40 @@ paths:
           description: Parametro non valido.
         '500':
           description: Errore interno del server.
+  /segnalazioni/{id}:
+    get:
+      summary: Ottieni i dettagli di una specifica segnalazione
+      description: Recupera i dettagli completi di una specifica segnalazione usando il suo ID
+      tags:
+        - Segnalazioni
+      security:
+        - bearerAuth: [ ] # authorizeRole(['operatore', 'admin'])
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della segnalazione da recuperare
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dettagli recuperati con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Segnalazione'
+        '404':
+          description: La segnalazione non è stata trovata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Errore interno del server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /segnalazioni/{id}/commento:
     patch:
       tags: [Segnalazioni]
@@ -1141,13 +1194,15 @@ paths:
           schema: { type: string, format: objectId }
       responses:
         '200':
-          description: Segnalazione marcata come letta.
+          description: Operazione completata con successo
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message: { type: string }
+                  message:
+                    type: string
+                    example: "Segnalazione marcata come letta" # oppure: "La segnalazione era già marcata come letta"
                   segnalazione: { $ref: '#/components/schemas/Segnalazione' }
         '404':
           description: Segnalazione non trovata.
@@ -1617,3 +1672,43 @@ paths:
           description: Percorso o Tappa non trovata.
         '500':
           description: Errore sul server.
+  /globalTimestamps/{key}:
+    get:
+      summary: Recupera il valore di un timestamp globale
+      tags:
+        - Global Timestamps
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+            enum: [ lastReportsUpdate ]
+          description: Chiave del timestamp globale da recuperare.
+      responses:
+        200:
+          description: Timestamp recuperato con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTimestamp'
+        400:
+          description: Chiave non valida o richiesta errata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        404:
+          description: Chiave non trovata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        500:
+          description: Errore interno del server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
