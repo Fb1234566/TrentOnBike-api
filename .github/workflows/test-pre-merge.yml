@@ -1,0 +1,32 @@
+name: Test Jest Automatici
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: Test
+
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Installa dipendenze
+        run: npm ci
+
+      - name: Esegui test Jest
+        run: npm test
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}}
+          BASE_URL: ${{ secrets.BASE_URL }}
+          MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
