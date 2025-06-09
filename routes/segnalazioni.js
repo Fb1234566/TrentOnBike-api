@@ -3,7 +3,7 @@ const router = express.Router();
 const Segnalazione = require('../models/Segnalazione');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
-const { VALID_KEYS, updateGlobalTimestamp } = require('../models/globalTimestamp');
+const { VALID_KEYS, updateGlobalTimestamp } = require('../models/GlobalTimestamp');
 
 /* I permessi dei vari endpoint seguono i principi di separazione dei ruoli e minimo privilegio:
 - utente autenticatom può:  creare segnalazioni, visualizzare quelle che ha già creato (non tutti i loro campi però)
