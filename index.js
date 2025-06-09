@@ -12,6 +12,7 @@ const percorsoRoutes = require('./routes/percorsi');
 const segnalazioniRoutes = require('./routes/segnalazioni');
 const gruppiSegnalazioniRoutes = require('./routes/gruppiSegnalazioni');
 const statisticheVieRoutes = require('./routes/statisticheVie');
+const indicazioniRoutes = require('./routes/indicazioni');
 
 // mongoose
 const mongoose = require('mongoose');
@@ -92,6 +93,7 @@ app.use("/api/v1/percorsi", percorsoRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoutes);
 app.use('/api/v1/gruppiSegnalazioni', gruppiSegnalazioniRoutes);
 app.use('/api/v1/statisticheVie', statisticheVieRoutes); // NUOVA ROUTE AGGIUNTA
+app.use('/api/v1/indicazioni', indicazioniRoutes); // NUOVA ROUTE AGGIUNTA
 
 // Gestione errori centralizzata (opzionale ma consigliata per produzione)
 app.use((err, req, res, next) => {
