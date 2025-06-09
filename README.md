@@ -3,7 +3,7 @@
 ## Setup
 Install all the dependencies:\
 ```bash
-npm i 
+npm i
 ```
 
 ## Start api
