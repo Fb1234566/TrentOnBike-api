@@ -95,7 +95,7 @@ describe('GET /indicazioni/route', () => {
         expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    test('Dovrebbe restituire errore 401 quando il token non è valido', async () => {
+    test('Dovrebbe restituire errore 403 quando il token non è valido', async () => {
         const response = await request(app)
             .get(`${baseUrl}/indicazioni/route`)
             .set('Authorization', 'Bearer token_non_valido')
