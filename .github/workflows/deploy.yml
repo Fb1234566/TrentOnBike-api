@@ -1,4 +1,4 @@
-name: Test Jest Automatici
+name: Test e Deploy
 
 on:
   push:
