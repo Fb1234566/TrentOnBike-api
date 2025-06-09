@@ -27,13 +27,16 @@ jobs:
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}}
+          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
           BASE_URL: ${{ secrets.BASE_URL }}
           MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
   deploy:
     name: Wait for Deploy
     runs-on: ubuntu-latest
     environment: Deploy
+    permissions:
+      deployments: write
+      contents: read
     needs: test
     steps:
       - name: Wait for Render Deployment
