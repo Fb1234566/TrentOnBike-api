@@ -449,9 +449,9 @@ router.get('/', authenticateToken, authorizeRole(['operatore', 'admin']), async 
             const dataInizio = req.query.daData ? new Date(req.query.daData) : null;
             const dataFine = req.query.aData ? new Date(req.query.aData) : null;
             if (dataInizio || dataFine) {
-                query.creatoIl = {};
-                if (dataInizio) query.creatoIl.$gte = dataInizio;
-                if (dataFine) query.creatoIl.$lte = dataFine;
+                query.creataIl = {};
+                if (dataInizio) query.creataIl.$gte = dataInizio;
+                if (dataFine) query.creataIl.$lte = dataFine;
             }
         }
 
@@ -626,7 +626,7 @@ router.patch('/:id/commento', authenticateToken, authorizeRole(['operatore']), a
             req.params.id,
             {
                 commento,
-                ultimaModificataIl: Date.now()
+                ultimaModificaIl: Date.now()
             },
             { new: true }
         );
