@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const {Percorso, Tappa} = require('../models/Percorso');
-const {PDI} = require('../models/PDI');
+const { Percorso, Tappa } = require('../models/Percorso');
+const PDI = require('../models/PDI');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
 
@@ -272,16 +272,21 @@ router.post("/:id/tappa", authenticateToken, authorizeRole(['operatore', 'admin'
         if (!percorso) {
             return res.status(404).json({ error: 'Percorso not found' });
         }
+
         if (tappa.posizione.length !== 2) {
             return res.status(400).json({ error: 'Posizione deve essere un array di due numeri (lng, lat)' });
         }
-        if (PDI.findById(tappa.puntoDiInteresse)) {
-            return res.status(400).json({ error: 'Posizione deve essere un array di due numeri (lng, lat)' });
+
+        // Verifica che il punto di interesse esista
+        const pdi = await PDI.findById(req.body.puntoDiInteresse);
+        if (!pdi) {
+            return res.status(400).json({ error: 'Punto di interesse non trovato' });
         }
-        tappa.save();
-        percorso.addTappa(tappa);
+
+        await tappa.save();
+        await percorso.addTappa(tappa);
         return res.status(201).json(percorso);
-    }catch(err){
+    } catch(err){
         return res.status(400).json({ error: err.message });
     }
 });
