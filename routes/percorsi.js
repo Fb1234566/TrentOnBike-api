@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {Percorso, Tappa} = require('../models/Percorso');
+const {PDI} = require('../models/PDI');
 const authenticateToken = require('../middleware/authenticateToken');
 const authorizeRole = require('../middleware/authorizeRole');
 
@@ -268,10 +269,16 @@ router.post("/:id/tappa", authenticateToken, authorizeRole(['operatore', 'admin'
     try{
         const tappa = new Tappa(req.body);
         const percorso = await Percorso.findById(req.params.id);
-        tappa.save();
         if (!percorso) {
             return res.status(404).json({ error: 'Percorso not found' });
         }
+        if (tappa.posizione.length !== 2) {
+            return res.status(400).json({ error: 'Posizione deve essere un array di due numeri (lng, lat)' });
+        }
+        if (PDI.findById(tappa.puntoDiInteresse)) {
+            return res.status(400).json({ error: 'Posizione deve essere un array di due numeri (lng, lat)' });
+        }
+        tappa.save();
         percorso.addTappa(tappa);
         return res.status(201).json(percorso);
     }catch(err){
