@@ -65,6 +65,10 @@ const swaggerOptions = {
             {
                 url: `http://localhost:${port}/api/v1/`,
                 description: "Development server"
+            },
+            {
+                url: 'https://trentonbike-api.onrender.com/api/v1/',
+                description: "Production server"
             }
             // Aggiungere altri server (staging, production) se necessario
         ],
