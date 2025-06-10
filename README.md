@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![NPM](https://img.shields.io/badge/NPM-%23CB3837.svg?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/)
-[![Deployment](https://github.com/Fb1234566/TrentOnBike-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/Fb1234566/TrentOnBike-api/actions/workflows/deploy.yml)
+[![Deployment](https://github.com/Fb1234566/TrentOnBike-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/Fb1234566/TrentOnBike-api/actions/workflows/deploy.yml)\
 Questo progetto è stato sviluppato come parte del corso di Ingegneria del Software all'Università di Trento.
 
 ## Descrizione
